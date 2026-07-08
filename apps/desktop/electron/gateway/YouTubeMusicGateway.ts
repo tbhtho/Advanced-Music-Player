@@ -106,22 +106,34 @@ export class YouTubeMusicGateway {
     contentLength?: number;
   }> {
     const attempt = async (yt: Innertube) => {
-      // getInfo(IOS) is only for format METADATA (mime + byte length). The actual audio comes from
-      // yt.download() — NOT info.download(): info.download reuses the already-fetched player data,
-      // whose formats carry no decipherable URL ("No valid URL to decipher"), whereas yt.download
-      // does its own IOS-client resolution that yields a live stream.
-      const info = await yt.getInfo(videoId, "IOS");
-      const format = info.chooseFormat({ type: "audio", quality: "best" });
-      const mimeType = (format?.mime_type ?? "audio/mp4").split(";")[0];
-      const totalBytes: number | undefined =
-        typeof format?.content_length === "number"
-          ? format.content_length
-          : Number(format?.content_length) || undefined;
+      // Metadata (mime + byte length) is best-effort via getBasicInfo — NOT getInfo. getInfo parses
+      // the whole watch page (related videos, endscreens…), and a single unexpected renderer there
+      // throws "Cannot read properties of undefined (reading 'url')" for some videos. getBasicInfo
+      // parses only the player response (the same light path yt.download uses internally), so it
+      // avoids that class of parser crash. If even it fails, we stream anyway with sane defaults.
+      let mimeType = "audio/mp4";
+      let totalBytes: number | undefined;
+      try {
+        const info = await yt.getBasicInfo(videoId, "IOS");
+        const format = info.chooseFormat({ type: "audio", quality: "best" });
+        if (format?.mime_type) {
+          mimeType = format.mime_type.split(";")[0];
+        }
+        totalBytes =
+          typeof format?.content_length === "number"
+            ? format.content_length
+            : Number(format?.content_length) || undefined;
+      } catch {
+        // Metadata unavailable — fall through with defaults (audio/mp4, unknown length → full 200).
+      }
 
       // Only honor a byte range when we know the total size — otherwise we can't advertise a valid
       // Content-Range, and serving mid-file bytes under a 200 would corrupt playback. Without a known
       // size a seek simply re-streams from 0 (handled: served=false → the handler answers 200).
       const served = range && totalBytes ? { start: range.start, end: range.end ?? totalBytes - 1 } : undefined;
+      // The actual audio comes from yt.download() — NOT info.download(): info.download reuses the
+      // already-fetched player data whose formats carry no decipherable URL ("No valid URL to
+      // decipher"), whereas yt.download does its own IOS-client resolution that yields a live stream.
       const webStream: ReadableStream<Uint8Array> = await yt.download(videoId, {
         type: "audio",
         quality: "best",
