@@ -32,11 +32,27 @@
  *                         that will NOT play DRM tracks — dev/CI convenience only).
  *   AMP_EVS_PYTHON=<path> Use a specific Python interpreter for the EVS tool.
  *   (Legacy MUSYNC_-prefixed variants are still honored.)
+ *
+ * AUTO-REAUTH: EVS auth tokens expire after a week-ish of inactivity, which used to fail
+ * the build with NonInteractiveError until someone manually ran `account reauth`. If
+ * EVS_ACCOUNT_NAME + EVS_PASSWD are set (env, or apps/desktop/.env.local — git-ignored),
+ * a failed sign triggers one non-interactive reauth + retry. CI provides the same pair
+ * via repo secrets, so both paths self-heal.
  */
 
 const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
+
+// Pull EVS_* (and anything else) from the desktop app's local env files. electron-builder
+// doesn't load these itself; override:false keeps real environment variables winning.
+try {
+  const dotenv = require("dotenv");
+  dotenv.config({ path: path.join(__dirname, "..", ".env.local"), override: false, quiet: true });
+  dotenv.config({ path: path.join(__dirname, "..", ".env"), override: false, quiet: true });
+} catch {
+  // dotenv missing is fine — env vars can still come from the shell/CI.
+}
 
 function log(message) {
   console.log(`[vmp] ${message}`);
@@ -168,21 +184,45 @@ exports.default = async function signVmp(context) {
     );
   }
 
+  const runSign = () =>
+    spawnSync(python, ["-m", "castlabs_evs.vmp", "sign-pkg", appOutDir], {
+      stdio: "inherit",
+      shell: false
+    });
+
   log(`Signing packaged app with castLabs EVS production VMP: ${appOutDir}`);
-  const result = spawnSync(python, ["-m", "castlabs_evs.vmp", "sign-pkg", appOutDir], {
-    stdio: "inherit",
-    shell: false
-  });
+  let result = runSign();
 
   if (result.error) {
     throw new Error(`EVS VMP signing failed to launch: ${result.error.message}`);
   }
+
+  // Expired session self-heal: reauth non-interactively with the stored credentials and
+  // retry the sign once. The password never hits the log.
+  const account = process.env.EVS_ACCOUNT_NAME;
+  const passwd = process.env.EVS_PASSWD;
+  if (result.status !== 0 && account && passwd) {
+    log(`Sign failed — EVS session likely expired. Re-authenticating as ${account}…`);
+    const reauth = spawnSync(
+      python,
+      ["-m", "castlabs_evs.account", "-n", "reauth", "-A", account, "-P", passwd],
+      { stdio: "inherit", shell: false }
+    );
+    if (reauth.status === 0) {
+      log("Reauth OK — retrying VMP sign.");
+      result = runSign();
+    } else {
+      log("Non-interactive reauth failed — check EVS_ACCOUNT_NAME / EVS_PASSWD in apps/desktop/.env.local.");
+    }
+  }
+
   if (result.status !== 0) {
     throw new Error(
       [
         `EVS VMP signing exited with code ${result.status}.`,
         "Common causes: not signed in (run `python -m castlabs_evs.account reauth`),",
-        "expired session, or no network. See apps/desktop/DRM-SIGNING.md."
+        "expired session, wrong EVS_ACCOUNT_NAME/EVS_PASSWD in apps/desktop/.env.local,",
+        "or no network. See apps/desktop/DRM-SIGNING.md."
       ].join("\n")
     );
   }
