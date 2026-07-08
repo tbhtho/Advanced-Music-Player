@@ -18,7 +18,7 @@ contextBridge.exposeInMainWorld("spotCloud", {
     reload: () => ipcRenderer.invoke("spot-cloud:reload-runtime")
   },
   gateway: {
-    request: (req: { provider: "spotify" | "soundcloud" | "deezer"; operation: string; variables?: Record<string, unknown> }) =>
+    request: (req: { provider: "spotify" | "soundcloud" | "deezer" | "youtube"; operation: string; variables?: Record<string, unknown> }) =>
       ipcRenderer.invoke("spot-cloud:gateway-request", req)
   },
   config: {
@@ -63,6 +63,12 @@ contextBridge.exposeInMainWorld("spotCloud", {
   },
   spotify: {
     getAnonymousSession: () => ipcRenderer.invoke("spot-cloud:get-anonymous-spotify-session")
+  },
+  localMusic: {
+    listFolders: () => ipcRenderer.invoke("spot-cloud:local-music-list-folders"),
+    addFolder: () => ipcRenderer.invoke("spot-cloud:local-music-add-folder"),
+    removeFolder: (folder: string) => ipcRenderer.invoke("spot-cloud:local-music-remove-folder", folder),
+    scan: () => ipcRenderer.invoke("spot-cloud:local-music-scan")
   },
   discord: {
     setPresence: (payload: unknown) => ipcRenderer.invoke("spot-cloud:set-discord-presence", payload),

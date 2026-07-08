@@ -1,4 +1,6 @@
-export type Provider = "spotify" | "soundcloud";
+export type Provider = "spotify" | "soundcloud" | "youtube" | "local";
+/** Providers that have an account/sign-in concept. Local files and YouTube (anonymous) do not. */
+export type OAuthProvider = "spotify" | "soundcloud";
 export type SoundCloudSubscriptionTier = "unknown" | "free" | "go" | "go-plus";
 export type ProviderSessionSource = "local" | "memory";
 export type ProviderStorageMode = "none" | "local-secure" | "memory-only";
@@ -101,7 +103,11 @@ export type ProviderVolumeMap = Record<Provider, number>;
 
 export const DEFAULT_PROVIDER_VOLUMES: ProviderVolumeMap = {
   spotify: 1,
-  soundcloud: 0.3
+  soundcloud: 0.3,
+  // Local files and YouTube both play through a plain <audio> element at full scale; the master
+  // volume is the only trim they need.
+  youtube: 1,
+  local: 1
 };
 
 export interface PlaybackState {

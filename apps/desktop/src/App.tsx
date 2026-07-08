@@ -57,7 +57,7 @@ import {
   VolumeX,
   X
 } from "lucide-react";
-import type { ProjectTrack, Provider, UnifiedTrack } from "@amp/core";
+import type { OAuthProvider, ProjectTrack, Provider, UnifiedTrack } from "@amp/core";
 import { getAppEnv } from "@/lib/env";
 import {
   finishDesktopStartupWindow,
@@ -102,7 +102,7 @@ const navItems = [
 const volumeProviders: Provider[] = ["spotify", "soundcloud"];
 
 const providerConsentCopy: Record<
-  Provider,
+  OAuthProvider,
   {
     title: string;
     summary: string;
@@ -140,7 +140,7 @@ const providerConsentCopy: Record<
   }
 };
 
-function getProviderConfigStatus(runtime: RuntimeInfo | undefined, provider: Provider) {
+function getProviderConfigStatus(runtime: RuntimeInfo | undefined, provider: OAuthProvider) {
   if (!runtime || runtime.platform === "browser") {
     return {
       ready: false,
@@ -164,7 +164,7 @@ function getProviderConfigStatus(runtime: RuntimeInfo | undefined, provider: Pro
   };
 }
 
-function getStorageBadgeText(runtime: RuntimeInfo | undefined, provider: Provider) {
+function getStorageBadgeText(runtime: RuntimeInfo | undefined, provider: OAuthProvider) {
   if (!runtime) {
     return "checking storage";
   }
@@ -951,7 +951,7 @@ function Onboarding({ showCustomChrome }: { showCustomChrome: boolean }) {
   const connections = useAppStore((state) => state.connections);
   const connectProvider = useAppStore((state) => state.connectProvider);
   const completeOnboarding = useAppStore((state) => state.completeOnboarding);
-  const [consentProvider, setConsentProvider] = useState<Provider | null>(null);
+  const [consentProvider, setConsentProvider] = useState<OAuthProvider | null>(null);
 
   const anyConnected =
     connections.spotify.status === "connected" || connections.soundcloud.status === "connected";
@@ -1213,8 +1213,11 @@ function PlayerBar({
       };
     }
 
+    // Linked mode scales only the trims the popover actually exposes (Spotify + SoundCloud);
+    // YouTube/local carry their defaults through untouched so the map stays complete.
     const scale = nextVolume / currentVolume;
     return {
+      ...drafts,
       spotify: clampUnit(drafts.spotify * scale),
       soundcloud: clampUnit(drafts.soundcloud * scale)
     };
@@ -2149,12 +2152,11 @@ function Switch({
 function ProviderTag({ provider }: { provider: Provider }) {
   return (
     <span
-      className={cn(
-        "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
-        provider === "spotify"
-          ? "bg-[var(--spotify)]/15 text-[var(--spotify)]"
-          : "bg-[var(--soundcloud)]/15 text-[var(--soundcloud)]"
-      )}
+      className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]"
+      style={{
+        backgroundColor: `color-mix(in srgb, var(--${provider}) 15%, transparent)`,
+        color: `var(--${provider})`
+      }}
     >
       {providerLabel(provider)}
     </span>
@@ -2342,13 +2344,11 @@ function TrackListRowBase({
 
   const openTrackMenu = useAppStore((state) => state.openTrackMenu);
 
-  // Provider tint — the mixed Library list leans SoundCloud rows orange and Spotify rows green so
-  // you can tell them apart at a glance. Selected/active rows keep the neutral --acid accent.
-  const tintVar = track.provider === "soundcloud" ? "--soundcloud-tint" : "--spotify-tint";
-  const restingBorder =
-    track.provider === "soundcloud"
-      ? "border-[var(--soundcloud-tint)]/30 bg-[var(--panel)] hover:border-[var(--soundcloud-tint)]/60"
-      : "border-[var(--spotify-tint)]/30 bg-[var(--panel)] hover:border-[var(--spotify-tint)]/60";
+  // Provider tint — the mixed Library list leans each row toward its provider colour (Spotify
+  // green, SoundCloud orange, YouTube red, Local blue) so you can tell them apart at a glance.
+  // Selected/active rows keep the neutral --acid accent.
+  const tintVar = `--${track.provider}-tint`;
+  const isNeutralRow = Boolean(selected) || Boolean(isActive);
 
   return (
     <div
@@ -2362,9 +2362,12 @@ function TrackListRowBase({
           ? "border-[var(--acid)] bg-[var(--acid)]/15"
           : isActive
             ? "border-[var(--acid)] bg-[var(--acid)]/10"
-            : restingBorder,
+            : "bg-[var(--panel)]",
         !track.playable && "opacity-45"
       )}
+      style={
+        isNeutralRow ? undefined : { borderColor: `color-mix(in srgb, var(${tintVar}) 30%, transparent)` }
+      }
     >
       {selecting ? (
         <button
@@ -3468,16 +3471,16 @@ function SearchPage() {
                     setQuery(event.target.value);
                   })
                 }
-                aria-label="Search Spotify and SoundCloud"
-                placeholder="Search Spotify and SoundCloud"
+                aria-label="Search Spotify, SoundCloud and YouTube"
+                placeholder="Search Spotify, SoundCloud and YouTube"
                 // shadow-none cancels the global input focus ring — the wrapper border is the focus cue here.
                 className="w-full bg-transparent text-sm text-[var(--paper)] outline-none focus:shadow-none focus-visible:shadow-none placeholder:text-[var(--muted)]"
               />
             </div>
           </div>
 
-          <div className="flex items-center gap-2" role="group" aria-label="Search provider">
-            {(["all", "spotify", "soundcloud"] as const).map((provider) => (
+          <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Search provider">
+            {(["all", "spotify", "soundcloud", "youtube"] as const).map((provider) => (
               <button
                 key={provider}
                 type="button"
@@ -3492,7 +3495,7 @@ function SearchPage() {
                     : "border border-[var(--edge)] bg-[var(--panel)] text-[var(--muted)]"
                 )}
               >
-                {provider === "all" ? "Both" : providerLabel(provider)}
+                {provider === "all" ? "All" : providerLabel(provider)}
               </button>
             ))}
           </div>
@@ -3575,6 +3578,8 @@ function LibraryPage() {
   const trackFeatures = useAppStore((state) => state.trackFeatures);
   const featuresStatus = useAppStore((state) => state.featuresStatus);
   const enrichLibraryFeatures = useAppStore((state) => state.enrichLibraryFeatures);
+  const localTracks = useAppStore((state) => state.localTracks);
+  const loadLocalMusic = useAppStore((state) => state.loadLocalMusic);
   const canSyncSpotifyLikes = connections.spotify.status === "connected";
   const [filter, setFilter] = useState("");
   const [trackToAdd, setTrackToAdd] = useState<UnifiedTrack | undefined>();
@@ -3592,8 +3597,11 @@ function LibraryPage() {
     [libraries.soundcloud?.items]
   );
   const allItems = useMemo(
-    () => interleaveLibrary(libraries.spotify?.items ?? [], libraries.soundcloud?.items ?? []),
-    [libraries.spotify?.items, libraries.soundcloud?.items]
+    () => [
+      ...interleaveLibrary(libraries.spotify?.items ?? [], libraries.soundcloud?.items ?? []),
+      ...localTracks
+    ],
+    [libraries.spotify?.items, libraries.soundcloud?.items, localTracks]
   );
   const scopedItems = useMemo(
     () =>
@@ -3685,6 +3693,11 @@ function LibraryPage() {
     void hydrateLibraries();
   }, [hydrateLibraries]);
 
+  // Scan configured local-music folders once when the Library opens (store no-ops if none).
+  useEffect(() => {
+    void loadLocalMusic();
+  }, [loadLocalMusic]);
+
   // Background-enrich the library with Deezer tempo/loudness + provider genres once it's loaded,
   // so the mood/genre chips fill in (and the radio scorer gains real vibe data). Throttled and
   // idempotent in the store, so re-running on library growth only fetches the new tracks.
@@ -3701,14 +3714,20 @@ function LibraryPage() {
       <div className="flex min-h-0 flex-1 flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
-            <SectionHeader title="Liked Songs" />
+            <SectionHeader title="Your library" />
             <p className="text-sm text-[var(--muted)]">
               <span style={{ color: "color-mix(in srgb, var(--spotify-tint) 60%, var(--paper))" }}>Spotify</span>
               {" + "}
               <span style={{ color: "color-mix(in srgb, var(--soundcloud-tint) 60%, var(--paper))" }}>
                 SoundCloud
               </span>
-              {", mixed together"}
+              {localTracks.length > 0 ? (
+                <>
+                  {" + "}
+                  <span style={{ color: "color-mix(in srgb, var(--local-tint) 60%, var(--paper))" }}>Local</span>
+                </>
+              ) : null}
+              {", one collection"}
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
@@ -3752,7 +3771,10 @@ function LibraryPage() {
             [
               { id: "all", label: "All", tint: null },
               { id: "spotify", label: "Spotify", tint: "--spotify-tint" },
-              { id: "soundcloud", label: "SoundCloud", tint: "--soundcloud-tint" }
+              { id: "soundcloud", label: "SoundCloud", tint: "--soundcloud-tint" },
+              ...(localTracks.length > 0
+                ? ([{ id: "local", label: "Local", tint: "--local-tint" }] as const)
+                : [])
             ] as const
           ).map((tab) => {
             const active = providerFilter === tab.id;
@@ -5024,6 +5046,76 @@ function AppearanceCard() {
   );
 }
 
+function LocalMusicCard() {
+  const folders = useAppStore((state) => state.localFolders);
+  const localTracks = useAppStore((state) => state.localTracks);
+  const scanStatus = useAppStore((state) => state.localScanStatus);
+  const loadLocalMusic = useAppStore((state) => state.loadLocalMusic);
+  const addLocalFolder = useAppStore((state) => state.addLocalFolder);
+  const removeLocalFolder = useAppStore((state) => state.removeLocalFolder);
+  const rescanLocalMusic = useAppStore((state) => state.rescanLocalMusic);
+  const scanning = scanStatus === "scanning";
+
+  // Load the folder list (and scan) the first time the card mounts, so Settings reflects reality
+  // even if the user never opened the Library tab this session.
+  useEffect(() => {
+    void loadLocalMusic();
+  }, [loadLocalMusic]);
+
+  return (
+    <SectionCard>
+      <SectionHeader
+        title="Local music"
+        count={localTracks.length > 0 ? localTracks.length : undefined}
+        action={
+          <Btn kind="ghost" disabled={scanning || folders.length === 0} onClick={() => void rescanLocalMusic()}>
+            <RefreshCcw className={cn("h-3.5 w-3.5", scanning && "animate-spin")} />
+            {scanning ? "Scanning…" : "Rescan"}
+          </Btn>
+        }
+      />
+      <p className="text-sm leading-6 text-[var(--muted)]">
+        Add folders of audio files (mp3, m4a, flac, wav, ogg…) and play them right alongside Spotify
+        and SoundCloud. Files never leave your machine.
+      </p>
+
+      <div className="mt-4 space-y-2">
+        {folders.length === 0 ? (
+          <EmptyState>No folders yet. Add one to bring your local library into AMP.</EmptyState>
+        ) : (
+          folders.map((folder) => (
+            <div
+              key={folder}
+              className="flex items-center gap-3 rounded-[var(--radius)] border border-[var(--edge)] bg-[var(--panel)] p-3"
+            >
+              <Headphones className="h-4 w-4 shrink-0 text-[var(--muted)]" />
+              <span className="min-w-0 flex-1 truncate text-sm text-[var(--paper)]" title={folder}>
+                {folder}
+              </span>
+              <button
+                type="button"
+                title="Remove folder"
+                aria-label={`Remove ${folder}`}
+                onClick={() => void removeLocalFolder(folder)}
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-sm)] border border-[var(--edge)] text-[var(--muted)] transition hover:border-[var(--warn)]/60 hover:text-[var(--warn)]"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+
+      <div className="mt-4">
+        <Btn kind="secondary" disabled={scanning} onClick={() => void addLocalFolder()}>
+          <Plus className="h-4 w-4" />
+          Add folder
+        </Btn>
+      </div>
+    </SectionCard>
+  );
+}
+
 function DiscordCard() {
   const enabled = useAppStore((state) => state.discordPresenceEnabled);
   const setDiscordPresenceEnabled = useAppStore((state) => state.setDiscordPresenceEnabled);
@@ -5194,7 +5286,7 @@ function SettingsPage() {
   const restartOnboarding = useAppStore((state) => state.restartOnboarding);
   const appEnv = getAppEnv();
   const showDeveloperTools = appEnv.enableSelfHostSetup;
-  const [consentProvider, setConsentProvider] = useState<Provider | null>(null);
+  const [consentProvider, setConsentProvider] = useState<OAuthProvider | null>(null);
   const [confirmRestart, setConfirmRestart] = useState(false);
   const [configForm, setConfigForm] = useState(desktopConfig);
 
@@ -5258,7 +5350,7 @@ function SettingsPage() {
           ) : null}
 
           <div className="mt-8 space-y-4">
-            {(["spotify"] as Provider[]).map((provider) => {
+            {(["spotify"] as OAuthProvider[]).map((provider) => {
               const connection = connections[provider];
               const providerConfig = getProviderConfigStatus(runtime, provider);
               const providerRuntime = runtime?.oauth[provider];
@@ -5346,6 +5438,7 @@ function SettingsPage() {
 
         <div className="space-y-6">
           <AppearanceCard />
+          <LocalMusicCard />
           <DiscordCard />
           <SectionCard>
             <SectionHeader title="Diagnostics" />
@@ -5499,9 +5592,9 @@ function ProviderConsentDialog({
   onClose,
   onConfirm
 }: {
-  provider: Provider | null;
+  provider: OAuthProvider | null;
   onClose(): void;
-  onConfirm(provider: Provider): void;
+  onConfirm(provider: OAuthProvider): void;
 }) {
   // Hooks BEFORE the early return — bailing out first changed the hook count between renders
   // (0 hooks closed → 1 open), which is a hard React crash the moment the dialog opens.

@@ -1,4 +1,5 @@
 import type {
+  OAuthProvider,
   Provider,
   ProviderCollection,
   ProviderSessionSource,
@@ -29,7 +30,7 @@ interface RuntimeInfo {
     node: string;
   };
   configDirectory: string;
-  oauth: Record<Provider, ProviderRuntimeOAuthStatus>;
+  oauth: Record<OAuthProvider, ProviderRuntimeOAuthStatus>;
   devServerUrl?: string;
 }
 
@@ -143,6 +144,12 @@ interface SpotCloudBridge {
   };
   spotify: {
     getAnonymousSession(): Promise<{ accessToken: string; clientToken: string } | undefined>;
+  };
+  localMusic: {
+    listFolders(): Promise<string[]>;
+    addFolder(): Promise<string[]>;
+    removeFolder(folder: string): Promise<string[]>;
+    scan(): Promise<{ ok: boolean; error?: string; tracks: UnifiedTrack[] }>;
   };
   discord: {
     setPresence(payload: unknown): Promise<{ ok: boolean }>;

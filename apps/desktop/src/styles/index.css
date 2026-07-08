@@ -24,10 +24,14 @@
   --song-rgb: 232, 228, 218;
   --spotify: #a8a6a0;
   --soundcloud: #a8a6a0;
+  --youtube: #a8a6a0;
+  --local: #a8a6a0;
   /* Provider tints — the one place colour breaks the monotone, so the mixed Library list can tell
-     Spotify (green) and SoundCloud (orange) tracks apart at a glance. */
+     Spotify (green), SoundCloud (orange), YouTube (red) and Local (blue) tracks apart at a glance. */
   --spotify-tint: #1ed760;
   --soundcloud-tint: #ff7a36;
+  --youtube-tint: #ff4d42;
+  --local-tint: #7aa2ff;
   /* Reserved green — only connection status uses this. */
   --connect: #1ed760;
   --warn: #ffb259;

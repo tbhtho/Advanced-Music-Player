@@ -288,17 +288,17 @@ export function saveVolume(volume: number): void {
 
 export function loadProviderVolumes(): ProviderVolumeMap {
   const prefs = readJson<UiPreferences>(UI_PREFS_KEY, {});
+  const resolve = (provider: Provider) =>
+    clampVolume(
+      typeof prefs.providerVolumes?.[provider] === "number"
+        ? (prefs.providerVolumes[provider] as number)
+        : DEFAULT_PROVIDER_VOLUMES[provider]
+    );
   return {
-    spotify: clampVolume(
-      typeof prefs.providerVolumes?.spotify === "number"
-        ? prefs.providerVolumes.spotify
-        : DEFAULT_PROVIDER_VOLUMES.spotify
-    ),
-    soundcloud: clampVolume(
-      typeof prefs.providerVolumes?.soundcloud === "number"
-        ? prefs.providerVolumes.soundcloud
-        : DEFAULT_PROVIDER_VOLUMES.soundcloud
-    )
+    spotify: resolve("spotify"),
+    soundcloud: resolve("soundcloud"),
+    youtube: resolve("youtube"),
+    local: resolve("local")
   };
 }
 

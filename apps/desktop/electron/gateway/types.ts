@@ -1,4 +1,4 @@
-export type GatewayProvider = "spotify" | "soundcloud" | "deezer";
+export type GatewayProvider = "spotify" | "soundcloud" | "deezer" | "youtube";
 
 export interface GatewayRequest {
   provider: GatewayProvider;

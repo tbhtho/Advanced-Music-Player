@@ -4,6 +4,7 @@ import {
   createEmptyPlaybackState,
   createPlaylistEntry,
   reorderPlaylistEntries,
+  type OAuthProvider,
   type PlaybackState,
   type ProviderCollection,
   type ProjectTrack,
@@ -101,6 +102,17 @@ import {
 } from "@/lib/trackFeatures";
 import { SoundCloudPlaybackAdapter } from "@/lib/providers/soundcloudAdapter";
 import { createSpotifyAdapter } from "@/lib/providers/createSpotifyAdapter";
+import {
+  createLocalAdapter,
+  createYouTubeAdapter,
+  type HtmlAudioAdapter
+} from "@/lib/providers/htmlAudioAdapter";
+import {
+  addLocalMusicFolder,
+  listLocalMusicFolders,
+  removeLocalMusicFolder,
+  scanLocalMusic
+} from "@/lib/desktopBridge";
 import type {
   SpotifyAlbumSummary,
   SpotifyBaseAdapter
@@ -225,6 +237,10 @@ interface AppState {
   trackFeatures: TrackFeatureMap;
   /** Whether a background feature-enrichment pass is currently running. */
   featuresStatus: "idle" | "enriching";
+  /** Local music: scanned tracks, configured folders, and scan lifecycle. */
+  localTracks: UnifiedTrack[];
+  localFolders: string[];
+  localScanStatus: "idle" | "scanning";
   initialize(): Promise<void>;
   saveDesktopConfig(config: DesktopConfig): Promise<void>;
   reloadRuntime(): Promise<void>;
@@ -233,15 +249,23 @@ interface AppState {
   clearNotice(): void;
   selectPlaylist(id?: string): void;
   selectProviderCollection(provider: Provider, collectionId: string): Promise<void>;
-  connectProvider(provider: Provider): Promise<void>;
+  connectProvider(provider: OAuthProvider): Promise<void>;
   /** Abort an in-flight provider sign-in and return the card to its disconnected state. */
-  cancelConnectProvider(provider: Provider): Promise<void>;
+  cancelConnectProvider(provider: OAuthProvider): Promise<void>;
   disconnectProvider(provider: Provider): Promise<void>;
   refreshProviderConnection(provider: Provider): Promise<ProviderConnection | undefined>;
   hydrateLibraries(force?: boolean): Promise<void>;
   search(query: string, provider?: SearchProvider): Promise<void>;
   /** Switch the search provider scope; the page's debounced effect re-runs the query. */
   setSearchProvider(provider: SearchProvider): void;
+  /** Load configured folders + scan them into localTracks (called on Library mount). */
+  loadLocalMusic(): Promise<void>;
+  /** Open the folder picker, add the chosen folder, and rescan. */
+  addLocalFolder(): Promise<void>;
+  /** Remove a folder and rescan the remainder. */
+  removeLocalFolder(folder: string): Promise<void>;
+  /** Re-scan the configured folders for new/changed files. */
+  rescanLocalMusic(): Promise<void>;
   createPlaylist(title: string): Promise<string>;
   renamePlaylist(id: string, title: string): Promise<void>;
   deletePlaylist(id: string): Promise<void>;
@@ -310,7 +334,9 @@ interface AppState {
 const queueEngine = new QueueEngine();
 const providerNames: Record<Provider, string> = {
   spotify: "Spotify",
-  soundcloud: "SoundCloud"
+  soundcloud: "SoundCloud",
+  youtube: "YouTube",
+  local: "Local"
 };
 
 const directSoundCloudProfileSources = new Set(["web-session", "local-connect"]);
@@ -345,17 +371,15 @@ function getPlaybackRequirementMessage(
 }
 
 const emptyLibrarySync = (): Record<Provider, LibrarySyncState> => ({
-  spotify: {
-    syncing: false,
-    importedCount: 0
-  },
-  soundcloud: {
-    syncing: false,
-    importedCount: 0
-  }
+  spotify: { syncing: false, importedCount: 0 },
+  soundcloud: { syncing: false, importedCount: 0 },
+  youtube: { syncing: false, importedCount: 0 },
+  local: { syncing: false, importedCount: 0 }
 });
 
-const providers: Provider[] = ["spotify", "soundcloud"];
+// The OAuth/library-sync providers. Local + YouTube have no remote library to hydrate, so they are
+// deliberately NOT in this list — their tracks come from the local scanner / live search instead.
+const providers: OAuthProvider[] = ["spotify", "soundcloud"];
 
 function getTrackKey(track: Pick<UnifiedTrack, "provider" | "providerTrackId" | "id">): string {
   return `${track.provider}:${track.providerTrackId || track.id}`;
@@ -564,6 +588,8 @@ export const useAppStore = create<AppState>((set, get) => {
   let lastLibraryHydrateSignature = "";
   let spotifyAdapter: SpotifyBaseAdapter | null = null;
   let soundCloudAdapter: SoundCloudPlaybackAdapter | null = null;
+  let youTubeAdapter: HtmlAudioAdapter | null = null;
+  let localAdapter: HtmlAudioAdapter | null = null;
   // De-dupes play logging in the queue subscription (a track emits "playing" many times).
   let lastLoggedPlayKey = "";
   // In-flight guards: `force` may bypass the freshness check but never overlaps a running build.
@@ -719,8 +745,13 @@ export const useAppStore = create<AppState>((set, get) => {
       }
     });
 
+    youTubeAdapter = createYouTubeAdapter(initialVolume * initialProviderVolumes.youtube);
+    localAdapter = createLocalAdapter(initialVolume * initialProviderVolumes.local);
+
     queueEngine.registerAdapter(spotifyAdapter);
     queueEngine.registerAdapter(soundCloudAdapter);
+    queueEngine.registerAdapter(youTubeAdapter);
+    queueEngine.registerAdapter(localAdapter);
     queueEngine.subscribe((playback) => {
       set((state) => ({
         playback,
@@ -833,7 +864,7 @@ export const useAppStore = create<AppState>((set, get) => {
   };
 
   const getMissingProviderConfigurationMessage = (
-    provider: Provider,
+    provider: OAuthProvider,
     runtime?: RuntimeInfo
   ): string | undefined => {
     if (!runtime || runtime.platform === "browser") {
@@ -875,6 +906,14 @@ export const useAppStore = create<AppState>((set, get) => {
     track: UnifiedTrack,
     source: ProjectTrackSource
   ): Promise<UnifiedTrack> => {
+    // YouTube + local tracks are ephemeral: never persist them into projectTracks. That pool seeds
+    // Daily Mixes / stations and the Library "liked" view — persisting a searched YouTube result or
+    // a scanned local file (which is rebuilt from disk each launch) would pollute it with entries
+    // that can't be enriched or re-searched and go stale when a folder is removed. Playlists still
+    // work: they store the track snapshot inline, independent of projectTracks.
+    if (track.provider === "youtube" || track.provider === "local") {
+      return track;
+    }
     if (track.projectTrackId) {
       return track;
     }
@@ -1160,6 +1199,9 @@ export const useAppStore = create<AppState>((set, get) => {
     spotifyLikedTrackIds: new Set<string>(),
     trackFeatures: loadTrackFeatures(),
     featuresStatus: "idle",
+    localTracks: [],
+    localFolders: [],
+    localScanStatus: "idle",
 
     async initialize() {
       if (get().initializing || get().initialized) {
@@ -1648,26 +1690,48 @@ export const useAppStore = create<AppState>((set, get) => {
       }
 
       set({ searchStatus: "loading" });
-      const targets = provider === "all" ? (["spotify", "soundcloud"] as Provider[]) : [provider];
+      // Live network providers to query. Local files aren't a network target — they're matched
+      // from the already-scanned library below (offline, instant).
+      const networkTargets: Provider[] =
+        provider === "all"
+          ? (["spotify", "soundcloud", "youtube"] as Provider[])
+          : provider === "local"
+            ? []
+            : [provider];
+      const includeLocal = provider === "all" || provider === "local";
+
+      const catalogProviders: Provider[] = provider === "all" ? ["spotify", "soundcloud"] : [provider];
       const catalogResults = dedupeTracks(
         get()
-          .projectTracks.filter((item) => targets.includes(item.provider))
+          .projectTracks.filter((item) => catalogProviders.includes(item.provider))
           .map((item) => item.track)
           .filter((track) => isTrackMatch(track, trimmedQuery))
       );
 
-      const results: UnifiedTrack[] = [...catalogResults];
+      const localResults = includeLocal
+        ? get().localTracks.filter((track) => isTrackMatch(track, trimmedQuery))
+        : [];
+
+      const results: UnifiedTrack[] = [...catalogResults, ...localResults];
       let failedTargets = 0;
 
-      for (const target of targets) {
+      const adapterFor = (target: Provider) =>
+        target === "spotify"
+          ? spotifyAdapter
+          : target === "soundcloud"
+            ? soundCloudAdapter
+            : target === "youtube"
+              ? youTubeAdapter
+              : null;
+
+      for (const target of networkTargets) {
         if (requestId !== activeSearchRequest) {
           return;
         }
 
-        // SoundCloud search works without OAuth (scraped public client_id) and Spotify
-        // search uses an anonymous token, so we always try the live adapter below. On
-        // failure we surface an honest error notice instead of inventing results.
-        const adapter = target === "spotify" ? spotifyAdapter : soundCloudAdapter;
+        // SoundCloud + YouTube search anonymously; Spotify uses an anonymous token. We always try
+        // the live adapter and surface an honest error notice on failure rather than inventing hits.
+        const adapter = adapterFor(target);
         if (!adapter) {
           failedTargets += 1;
           set({ notice: `${providerNames[target]} search isn't available right now.` });
@@ -1679,7 +1743,12 @@ export const useAppStore = create<AppState>((set, get) => {
           if (requestId !== activeSearchRequest) {
             return;
           }
-          const importedResults = await ingestTracks(providerResults ?? [], "search");
+          // YouTube/local tracks are ephemeral (no persisted project record); only Spotify/SoundCloud
+          // results are ingested so their like/library plumbing keeps working.
+          const importedResults =
+            target === "youtube"
+              ? providerResults ?? []
+              : await ingestTracks(providerResults ?? [], "search");
           results.push(...importedResults);
         } catch (error) {
           if (requestId !== activeSearchRequest) {
@@ -1699,10 +1768,65 @@ export const useAppStore = create<AppState>((set, get) => {
         const deduped = dedupeTracks(results);
         set({
           searchResults: deduped,
-          // "error" only when every provider failed AND nothing local matched — partial results
-          // still count as a successful search.
-          searchStatus: failedTargets === targets.length && deduped.length === 0 ? "error" : "ready"
+          // "error" only when every network provider failed AND nothing matched at all — partial
+          // results (or offline local hits) still count as a successful search.
+          searchStatus:
+            networkTargets.length > 0 && failedTargets === networkTargets.length && deduped.length === 0
+              ? "error"
+              : "ready"
         });
+      }
+    },
+
+    async loadLocalMusic() {
+      if (get().localScanStatus === "scanning") {
+        return;
+      }
+      set({ localScanStatus: "scanning" });
+      try {
+        const folders = await listLocalMusicFolders();
+        set({ localFolders: folders });
+        if (folders.length === 0) {
+          set({ localTracks: [] });
+          return;
+        }
+        const result = await scanLocalMusic();
+        if (result.ok) {
+          set({ localTracks: result.tracks });
+        } else if (result.error) {
+          set({ notice: result.error });
+        }
+      } finally {
+        set({ localScanStatus: "idle" });
+      }
+    },
+
+    async addLocalFolder() {
+      const folders = await addLocalMusicFolder();
+      set({ localFolders: folders });
+      await get().rescanLocalMusic();
+    },
+
+    async removeLocalFolder(folder) {
+      const folders = await removeLocalMusicFolder(folder);
+      set({ localFolders: folders });
+      await get().rescanLocalMusic();
+    },
+
+    async rescanLocalMusic() {
+      if (get().localScanStatus === "scanning") {
+        return;
+      }
+      set({ localScanStatus: "scanning" });
+      try {
+        const result = await scanLocalMusic();
+        if (result.ok) {
+          set({ localTracks: result.tracks });
+        } else if (result.error) {
+          set({ notice: result.error });
+        }
+      } finally {
+        set({ localScanStatus: "idle" });
       }
     },
 

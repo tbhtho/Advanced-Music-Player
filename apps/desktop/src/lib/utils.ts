@@ -25,8 +25,15 @@ export function formatClock(iso?: string): string {
   }).format(new Date(iso));
 }
 
+const PROVIDER_LABELS: Record<Provider, string> = {
+  spotify: "Spotify",
+  soundcloud: "SoundCloud",
+  youtube: "YouTube",
+  local: "Local"
+};
+
 export function providerLabel(provider: Provider): string {
-  return provider === "spotify" ? "Spotify" : "SoundCloud";
+  return PROVIDER_LABELS[provider] ?? provider;
 }
 
 /**
@@ -57,7 +64,7 @@ export function displayCreators(creators: string[]): string {
 }
 
 export function providerAccent(provider: Provider): string {
-  return provider === "spotify" ? "spotify" : "soundcloud";
+  return provider;
 }
 
 export function isTrackMatch(track: UnifiedTrack, query: string): boolean {

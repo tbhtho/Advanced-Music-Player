@@ -8,6 +8,8 @@ import {
   ipcMain,
   Menu,
   nativeImage,
+  net,
+  protocol,
   safeStorage,
   screen,
   session,
@@ -21,9 +23,10 @@ import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath, URL } from "node:url";
+import { fileURLToPath, pathToFileURL, URL } from "node:url";
 import type { ProviderCollection, UnifiedTrack } from "@amp/core";
 import { ProviderGateway, type GatewayResponse } from "./gateway/index.js";
+import { LocalMusicManager } from "./localMusic.js";
 import { readDecryptedCookies, KeychainAccessError } from "./chromiumCookies.js";
 import {
   readChromiumCookiesViaRemoteDebugging,
@@ -206,6 +209,21 @@ interface JsonErrorBody {
 }
 
 const isDev = !!process.env.VITE_DEV_SERVER_URL;
+
+// Custom media schemes for local files and proxied YouTube audio. MUST be registered before app
+// ready. `stream` + `supportFetchAPI` let <audio> issue ranged requests against them; `secure` +
+// `standard` make them first-class origins so media playback and seeking work like http(s).
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: "amp-local",
+    privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, bypassCSP: true }
+  },
+  {
+    scheme: "amp-stream",
+    privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, bypassCSP: true }
+  }
+]);
+
 // OAuth deep-link scheme. The redirect URIs registered in the Spotify/SoundCloud dashboards use
 // musync://, so that stays the ACTIVE scheme for outbound auth requests; amp:// is also registered
 // and accepted inbound, so the dashboards can migrate to it later without a code change.
@@ -358,6 +376,7 @@ let cachedSoundCloudPublicClientId:
   | undefined;
 
 let providerGateway: ProviderGateway | undefined;
+let localMusicManager: LocalMusicManager | undefined;
 let mainWindowStartupComplete = false;
 
 // The internal Electron app name now matches the brand: "AMP". The userData dir derives from it
@@ -3483,6 +3502,10 @@ app.whenReady().then(async () => {
     })
     .catch((error) => logStartup("gateway:initialization-failed", error));
 
+  localMusicManager = new LocalMusicManager(app.getPath("userData"));
+  void localMusicManager.initialize().catch((error) => logStartup("local-music:init-failed", error));
+  registerMediaProtocols();
+
   // castLabs ECS (electron-releases +wvcus) installs the Widevine CDM on demand through the
   // components service. It MUST be ready BEFORE the BrowserWindow loads any EME content, otherwise
   // the CDM initialises late/unverified — which makes the Spotify Web Playback SDK play only its
@@ -3690,6 +3713,83 @@ ipcMain.handle("spot-cloud:open-devtools", async () => {
   }
 });
 
+/** Parse an HTTP Range header ("bytes=START-END") into a start/optional-end pair. */
+function parseRangeHeader(header: string | null): { start: number; end?: number } | undefined {
+  if (!header) {
+    return undefined;
+  }
+  const match = /^bytes=(\d+)-(\d*)$/.exec(header.trim());
+  if (!match) {
+    return undefined;
+  }
+  const start = Number(match[1]);
+  const end = match[2] ? Number(match[2]) : undefined;
+  if (!Number.isFinite(start) || (end !== undefined && (!Number.isFinite(end) || end < start))) {
+    return undefined;
+  }
+  return { start, end };
+}
+
+// Custom media protocol handlers. amp-local serves whitelisted local audio + extracted artwork;
+// amp-stream proxies YouTube audio resolved by the gateway (bytes never touch the renderer as a URL).
+function registerMediaProtocols(): void {
+  protocol.handle("amp-local", async (request) => {
+    try {
+      const url = new URL(request.url);
+      const kind = url.hostname; // "audio" | "art"
+      const id = decodeURIComponent(url.pathname.replace(/^\//, ""));
+      if (!localMusicManager || !id) {
+        return new Response("Not found", { status: 404 });
+      }
+      const filePath =
+        kind === "art" ? localMusicManager.resolveArtworkPath(id) : localMusicManager.resolveAudioPath(id);
+      if (!filePath) {
+        return new Response("Not found", { status: 404 });
+      }
+      // net.fetch on a file:// URL handles Range + content-type; forwarding the request headers
+      // gives <audio> seeking for free.
+      return net.fetch(pathToFileURL(filePath).toString(), {
+        headers: request.headers,
+        method: request.method
+      });
+    } catch (error) {
+      logStartup("amp-local:error", error);
+      return new Response("Local media error", { status: 500 });
+    }
+  });
+
+  protocol.handle("amp-stream", async (request) => {
+    try {
+      const url = new URL(request.url);
+      if (url.hostname !== "youtube") {
+        return new Response("Not found", { status: 404 });
+      }
+      const videoId = decodeURIComponent(url.pathname.replace(/^\//, ""));
+      if (!providerGateway || !videoId) {
+        return new Response("Not found", { status: 404 });
+      }
+      const range = parseRangeHeader(request.headers.get("range"));
+      const { webStream, mimeType, totalBytes, servedRange, contentLength } =
+        await providerGateway.getYouTubeStream(videoId, range);
+      const headers = new Headers({ "Content-Type": mimeType, "Accept-Ranges": "bytes" });
+      if (contentLength != null) {
+        headers.set("Content-Length", String(contentLength));
+      }
+      // 206 ONLY when the gateway actually served a byte range (it declines ranges it can't bound,
+      // returning the full body instead — answering 200 there keeps the body and status consistent).
+      let status = 200;
+      if (servedRange && totalBytes) {
+        headers.set("Content-Range", `bytes ${servedRange.start}-${servedRange.end}/${totalBytes}`);
+        status = 206;
+      }
+      return new Response(webStream, { status, headers });
+    } catch (error) {
+      logStartup("amp-stream:error", error);
+      return new Response("Stream error", { status: 502 });
+    }
+  });
+}
+
 // Hardware media keys → renderer transport actions. Registered once at startup; failures are
 // non-fatal (another player may already own a key).
 function registerMediaKeys(): void {
@@ -3767,6 +3867,44 @@ ipcMain.handle("spot-cloud:gateway-request", async (_, request) => {
       ok: false,
       error: error instanceof Error ? error.message : "Gateway request failed.",
       source: "fallback"
+    };
+  }
+});
+
+// ── Local music ──────────────────────────────────────────────────────────────────────────────
+ipcMain.handle("spot-cloud:local-music-list-folders", async () => {
+  return (await localMusicManager?.getFolders()) ?? [];
+});
+
+ipcMain.handle("spot-cloud:local-music-add-folder", async () => {
+  // Open a native folder picker; returns the updated folder list (unchanged if cancelled).
+  const parent = mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined;
+  const result = parent
+    ? await dialog.showOpenDialog(parent, { properties: ["openDirectory"] })
+    : await dialog.showOpenDialog({ properties: ["openDirectory"] });
+  if (result.canceled || result.filePaths.length === 0 || !localMusicManager) {
+    return (await localMusicManager?.getFolders()) ?? [];
+  }
+  return localMusicManager.addFolder(result.filePaths[0]);
+});
+
+ipcMain.handle("spot-cloud:local-music-remove-folder", async (_, folder: string) => {
+  return (await localMusicManager?.removeFolder(folder)) ?? [];
+});
+
+ipcMain.handle("spot-cloud:local-music-scan", async () => {
+  if (!localMusicManager) {
+    return { ok: false, error: "Local music is not available.", tracks: [] as UnifiedTrack[] };
+  }
+  try {
+    const tracks = await localMusicManager.scan();
+    return { ok: true, tracks };
+  } catch (error) {
+    logStartup("local-music:scan-failed", error);
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Local music scan failed.",
+      tracks: [] as UnifiedTrack[]
     };
   }
 });

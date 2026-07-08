@@ -14,7 +14,19 @@ export default defineConfig({
         vite: {
           build: {
             rollupOptions: {
-              external: ["@spdl/widevine", "protobufjs", "protobufjs/minimal", "protobufjs/minimal.js"]
+              // Node/native-ish deps that must resolve from node_modules at runtime, not be bundled.
+              // youtubei.js/jsdom/bgutils-js power YouTube stream resolution; music-metadata reads
+              // local file tags. The packaged build ships the prod-dep closure so these resolve.
+              external: [
+                "@spdl/widevine",
+                "protobufjs",
+                "protobufjs/minimal",
+                "protobufjs/minimal.js",
+                "youtubei.js",
+                "bgutils-js",
+                "jsdom",
+                "music-metadata"
+              ]
             }
           }
         }

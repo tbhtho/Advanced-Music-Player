@@ -6,15 +6,19 @@ Search Spotify and SoundCloud together, build playlists that mix both, and play 
 
 ## Features
 
-- Unified search across both services (SoundCloud works without signing in)
-- One library and playlists that freely mix Spotify and SoundCloud tracks
-- Like/save on both providers, everywhere — player bar, lists, search, playlists
+- Unified search across Spotify, SoundCloud and YouTube (SoundCloud + YouTube work without signing in)
+- Play your own local audio files (mp3, m4a, flac, wav, ogg…) alongside everything else
+- One library and playlists that freely mix every source
+- Like/save on Spotify and SoundCloud, everywhere — player bar, lists, search, playlists
 - Song-seeded radio and daily mixes, scored by tempo / genre / vibe
 - Artist and album pages, mood + genre filters, on-device listening stats
 - SoundCloud MP3 downloads, optional Discord Rich Presence
 - Windows audio-reactive gradient (beat-synced)
 
 No crossfade — the Spotify SDK can't do it honestly, so it's left out.
+
+> YouTube playback uses unofficial stream extraction, so it can be flaky and may break when YouTube
+> changes things — treat it as best-effort. Local files and the other providers are unaffected.
 
 ## Download
 

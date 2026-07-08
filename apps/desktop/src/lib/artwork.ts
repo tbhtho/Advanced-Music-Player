@@ -10,6 +10,16 @@ const providerPalette: Record<Provider, { background: string; accent: string; sh
     background: "#26150b",
     accent: "#ff6a1a",
     shadow: "#160f0b"
+  },
+  youtube: {
+    background: "#251012",
+    accent: "#ff3d34",
+    shadow: "#160b0c"
+  },
+  local: {
+    background: "#151a24",
+    accent: "#7aa2ff",
+    shadow: "#0d1017"
   }
 };
 

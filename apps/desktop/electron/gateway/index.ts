@@ -3,6 +3,7 @@ import { CacheStore } from "./CacheStore";
 import { DeezerGateway } from "./DeezerGateway";
 import { SoundCloudInternalGateway } from "./SoundCloudInternalGateway";
 import { SpotifyPartnerGateway } from "./SpotifyPartnerGateway";
+import { YouTubeMusicGateway } from "./YouTubeMusicGateway";
 import type { GatewayRequest, GatewayResponse } from "./types";
 
 export type { GatewayRequest, GatewayResponse } from "./types";
@@ -12,17 +13,26 @@ export class ProviderGateway {
   private spotify: SpotifyPartnerGateway;
   private soundcloud: SoundCloudInternalGateway;
   private deezer: DeezerGateway;
+  private youtube: YouTubeMusicGateway;
 
   constructor(userDataPath: string) {
     this.cache = new CacheStore(userDataPath);
     this.spotify = new SpotifyPartnerGateway(this.cache);
     this.soundcloud = new SoundCloudInternalGateway(this.cache);
     this.deezer = new DeezerGateway(this.cache);
+    this.youtube = new YouTubeMusicGateway(this.cache);
   }
 
   async initialize(): Promise<void> {
     await this.cache.initialize();
+    // YouTube warm-up is fire-and-forget: PO-token generation is slow and non-critical to boot.
+    void this.youtube.initialize();
     await Promise.all([this.spotify.initialize(), this.soundcloud.initialize()]);
+  }
+
+  /** Resolve a YouTube audio stream for the amp-stream:// protocol handler (main process only). */
+  getYouTubeStream(videoId: string, range?: { start: number; end?: number }) {
+    return this.youtube.getStream(videoId, range);
   }
 
   async request(req: GatewayRequest): Promise<GatewayResponse> {
@@ -33,8 +43,24 @@ export class ProviderGateway {
         return this.handleSoundCloudRequest(req);
       case "deezer":
         return this.handleDeezerRequest(req);
+      case "youtube":
+        return this.handleYouTubeRequest(req);
       default:
         return { ok: false, error: `Unknown provider: ${req.provider}`, source: "fallback" };
+    }
+  }
+
+  private async handleYouTubeRequest(req: GatewayRequest): Promise<GatewayResponse> {
+    switch (req.operation) {
+      case "search": {
+        const query = req.variables?.query as string;
+        if (!query) {
+          return { ok: false, error: "Search query required.", source: "fallback" };
+        }
+        return this.youtube.search(query);
+      }
+      default:
+        return { ok: false, error: `Unknown YouTube operation: ${req.operation}`, source: "fallback" };
     }
   }
 

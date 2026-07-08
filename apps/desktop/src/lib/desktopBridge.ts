@@ -1,4 +1,5 @@
 import type {
+  OAuthProvider,
   Provider,
   ProviderCollection,
   ProviderSessionSource,
@@ -22,7 +23,7 @@ export interface RuntimeInfo {
     node: string;
   };
   configDirectory: string;
-  oauth: Record<Provider, ProviderRuntimeOAuthStatus>;
+  oauth: Record<OAuthProvider, ProviderRuntimeOAuthStatus>;
   devServerUrl?: string;
 }
 
@@ -113,7 +114,7 @@ export function hasDesktopBridge(): boolean {
 }
 
 export async function gatewayRequest<T = unknown>(req: {
-  provider: "spotify" | "soundcloud" | "deezer";
+  provider: "spotify" | "soundcloud" | "deezer" | "youtube";
   operation: string;
   variables?: Record<string, unknown>;
 }): Promise<GatewayResponse<T>> {
@@ -225,6 +226,39 @@ export function subscribeMediaKeys(
     return () => undefined;
   }
   return window.spotCloud.media.onMediaKey(callback);
+}
+
+// ── Local music ────────────────────────────────────────────────────────────────────────────────
+export async function listLocalMusicFolders(): Promise<string[]> {
+  if (!hasDesktopBridge() || !window.spotCloud?.localMusic) {
+    return [];
+  }
+  return window.spotCloud.localMusic.listFolders();
+}
+
+export async function addLocalMusicFolder(): Promise<string[]> {
+  if (!hasDesktopBridge() || !window.spotCloud?.localMusic) {
+    return [];
+  }
+  return window.spotCloud.localMusic.addFolder();
+}
+
+export async function removeLocalMusicFolder(folder: string): Promise<string[]> {
+  if (!hasDesktopBridge() || !window.spotCloud?.localMusic) {
+    return [];
+  }
+  return window.spotCloud.localMusic.removeFolder(folder);
+}
+
+export async function scanLocalMusic(): Promise<{
+  ok: boolean;
+  error?: string;
+  tracks: UnifiedTrack[];
+}> {
+  if (!hasDesktopBridge() || !window.spotCloud?.localMusic) {
+    return { ok: false, error: "Local music is only available in the desktop app.", tracks: [] };
+  }
+  return window.spotCloud.localMusic.scan();
 }
 
 export async function getDesktopWindowState(): Promise<DesktopWindowState> {
