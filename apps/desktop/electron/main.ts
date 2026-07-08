@@ -4,6 +4,7 @@ import {
   components,
   desktopCapturer,
   dialog,
+  globalShortcut,
   ipcMain,
   Menu,
   nativeImage,
@@ -2716,7 +2717,11 @@ async function refreshProviderSession(provider: Provider): Promise<ProviderOAuth
       await clearLocalProviderSession(provider).catch(() => undefined);
       return null;
     }
-    throw error;
+    // Transient failure (e.g. offline at boot): keep the stored session for a later retry, but
+    // resolve null instead of rejecting — a rejection here left the renderer's session-restore
+    // await hanging in a permanent "connecting" state.
+    logStartup(`auth:${provider}:refresh-transient-failure`, error);
+    return null;
   }
 }
 
@@ -2981,9 +2986,18 @@ async function ensureSoundCloudLikeWindow(): Promise<BrowserWindow> {
         soundCloudLikeWindow = undefined;
         soundCloudLikeWindowReady = undefined;
       });
-      // Loading a real soundcloud.com page makes DataDome issue its cookie to this session (which
-      // already holds the injected oauth_token), so subsequent in-page like fetches are trusted.
-      await win.loadURL("https://soundcloud.com/discover");
+      try {
+        // Loading a real soundcloud.com page makes DataDome issue its cookie to this session (which
+        // already holds the injected oauth_token), so subsequent in-page like fetches are trusted.
+        await win.loadURL("https://soundcloud.com/discover");
+      } catch (error) {
+        // A failed load would otherwise cache this rejected promise forever (the window never
+        // fires "closed"), permanently breaking likes until restart. Destroy + reset so the next
+        // like attempt rebuilds the window.
+        soundCloudLikeWindowReady = undefined;
+        win.destroy();
+        throw error;
+      }
       soundCloudLikeWindow = win;
       return win;
     })();
@@ -3486,6 +3500,7 @@ app.whenReady().then(async () => {
 
   await createMainWindow();
   createTray();
+  registerMediaKeys();
 
   const launchProtocolUrl = process.argv.find((arg) =>
     protocolSchemes.some((scheme) => arg.startsWith(`${scheme}://`))
@@ -3515,6 +3530,10 @@ app.on("before-quit", () => {
   // Any path that genuinely quits (OS shutdown, installer, Cmd+Q) must bypass close-to-tray.
   isQuitting = true;
   discordPresence.stop();
+  globalShortcut.unregisterAll();
+  // Persist pending gateway-cache writes now — the 2s debounce alone drops them on quit.
+  // Synchronous on purpose: an async write started here can be cut off when the process exits.
+  providerGateway?.flushCache();
 });
 
 app.on("window-all-closed", () => {
@@ -3619,17 +3638,25 @@ ipcMain.handle("spot-cloud:close-window", async () => {
 // playing because it's the same window/renderer — we only change the window's size + the React view.
 let compactRestoreBounds: { x: number; y: number; width: number; height: number } | undefined;
 let compactWasMaximized = false;
+// Explicit mode flag — inferring "already compact" from window properties (e.g. resizability)
+// breaks the moment any other feature toggles the same property.
+let isCompactMode = false;
 ipcMain.handle("spot-cloud:set-compact-mode", async (_, compact: boolean) => {
   const win = mainWindow;
   if (!win || win.isDestroyed()) {
     return { compact: false };
   }
   if (compact) {
-    compactWasMaximized = win.isMaximized();
-    if (compactWasMaximized) {
-      win.unmaximize();
+    if (!isCompactMode) {
+      // Only capture restore bounds on a real full→compact transition; a repeated compact call
+      // would otherwise overwrite them with the mini size and "restore" to a 384×116 window.
+      compactWasMaximized = win.isMaximized();
+      if (compactWasMaximized) {
+        win.unmaximize();
+      }
+      compactRestoreBounds = win.getBounds();
     }
-    compactRestoreBounds = win.getBounds();
+    isCompactMode = true;
     const width = 384;
     const height = 116;
     const area = screen.getDisplayMatching(win.getBounds()).workArea;
@@ -3643,6 +3670,7 @@ ipcMain.handle("spot-cloud:set-compact-mode", async (_, compact: boolean) => {
     });
     win.setAlwaysOnTop(true, "floating");
   } else {
+    isCompactMode = false;
     win.setAlwaysOnTop(false);
     win.setResizable(true);
     win.setMinimumSize(mainWindowMinimumBounds.width, mainWindowMinimumBounds.height);
@@ -3661,6 +3689,27 @@ ipcMain.handle("spot-cloud:open-devtools", async () => {
     mainWindow.webContents.openDevTools({ mode: "detach" });
   }
 });
+
+// Hardware media keys → renderer transport actions. Registered once at startup; failures are
+// non-fatal (another player may already own a key).
+function registerMediaKeys(): void {
+  const bindings: Array<{ accelerator: string; action: "play-pause" | "next" | "previous" }> = [
+    { accelerator: "MediaPlayPause", action: "play-pause" },
+    { accelerator: "MediaNextTrack", action: "next" },
+    { accelerator: "MediaPreviousTrack", action: "previous" }
+  ];
+  for (const { accelerator, action } of bindings) {
+    try {
+      globalShortcut.register(accelerator, () => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send("spot-cloud:media-key", action);
+        }
+      });
+    } catch (error) {
+      logStartup(`media-keys:register-failed:${accelerator}`, error);
+    }
+  }
+}
 
 function registerWindowShortcuts(window: BrowserWindow): void {
   window.webContents.on("before-input-event", (event, input) => {
@@ -3698,6 +3747,16 @@ ipcMain.handle("spot-cloud:cancel-connect-provider", (_, provider: Provider) => 
 ipcMain.handle("spot-cloud:gateway-request", async (_, request) => {
   if (!providerGateway) {
     return { ok: false, error: "Provider gateway not initialized.", source: "fallback" };
+  }
+  // Minimal shape check so a malformed payload gets a structured failure instead of whatever the
+  // gateway internals happen to throw on it.
+  if (
+    !request ||
+    typeof request !== "object" ||
+    typeof (request as { provider?: unknown }).provider !== "string" ||
+    typeof (request as { operation?: unknown }).operation !== "string"
+  ) {
+    return { ok: false, error: "Malformed gateway request.", source: "fallback" };
   }
 
   try {
@@ -3761,7 +3820,9 @@ ipcMain.handle("spot-cloud:soundcloud-local-list-profiles", async () => {
 
 ipcMain.handle("spot-cloud:soundcloud-local-connect", async (_, request: SoundCloudLocalConnectRequest) => {
   try {
-    return connectSoundCloudBrowserProfile(request);
+    // `return await` (not bare `return`) so an async rejection is caught HERE and returned as
+    // the { ok:false } shape the renderer expects, instead of rejecting its invoke promise.
+    return await connectSoundCloudBrowserProfile(request);
   } catch (error) {
     logStartup("soundcloud:local-connect:failed", error);
     return {

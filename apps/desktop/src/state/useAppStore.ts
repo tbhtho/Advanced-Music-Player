@@ -208,6 +208,8 @@ interface AppState {
   searchProvider: SearchProvider;
   searchQuery: string;
   searchResults: UnifiedTrack[];
+  /** Search lifecycle so the page can distinguish "type to search", in-flight, and zero results. */
+  searchStatus: "idle" | "loading" | "ready" | "error";
   playback: PlaybackState;
   shuffle: boolean;
   accentSource: AccentSource;
@@ -238,12 +240,15 @@ interface AppState {
   refreshProviderConnection(provider: Provider): Promise<ProviderConnection | undefined>;
   hydrateLibraries(force?: boolean): Promise<void>;
   search(query: string, provider?: SearchProvider): Promise<void>;
+  /** Switch the search provider scope; the page's debounced effect re-runs the query. */
+  setSearchProvider(provider: SearchProvider): void;
   createPlaylist(title: string): Promise<string>;
   renamePlaylist(id: string, title: string): Promise<void>;
   deletePlaylist(id: string): Promise<void>;
   addTrackToPlaylist(playlistId: string, track: UnifiedTrack): Promise<void>;
   addTracksToPlaylist(playlistId: string, tracks: UnifiedTrack[]): Promise<void>;
-  importCollectionAsPlaylist(provider: Provider, collectionId: string, title: string): Promise<void>;
+  /** Copy a provider collection into a local playlist. Resolves true only on real success. */
+  importCollectionAsPlaylist(provider: Provider, collectionId: string, title: string): Promise<boolean>;
   removeTrackFromPlaylist(playlistId: string, entryId: string): Promise<void>;
   setSoundCloudTrackLiked(track: UnifiedTrack, liked: boolean): Promise<void>;
   setSpotifyTrackLiked(track: UnifiedTrack, liked: boolean): Promise<void>;
@@ -256,6 +261,8 @@ interface AppState {
   reorderQueue(fromIndex: number, toIndex: number): void;
   /** Remove one upcoming/previous track from the live queue without interrupting playback. */
   removeFromQueue(index: number): void;
+  /** Clear the queue down to just the currently playing track (playback keeps going). */
+  clearQueue(): void;
   /** (Re)build artist-anchored Daily Mixes for today, discovering new cross-provider tracks. */
   generateDailyMixes(force?: boolean): Promise<void>;
   /** Start a song-seeded cross-provider station and begin playing it. */
@@ -557,6 +564,11 @@ export const useAppStore = create<AppState>((set, get) => {
   let lastLibraryHydrateSignature = "";
   let spotifyAdapter: SpotifyBaseAdapter | null = null;
   let soundCloudAdapter: SoundCloudPlaybackAdapter | null = null;
+  // De-dupes play logging in the queue subscription (a track emits "playing" many times).
+  let lastLoggedPlayKey = "";
+  // In-flight guards: `force` may bypass the freshness check but never overlaps a running build.
+  let dailyMixesBuilding = false;
+  let stationBuilding = false;
 
   const persistPlaylist = async (playlist: UnifiedPlaylist) => {
     await upsertPlaylist(playlist);
@@ -717,6 +729,21 @@ export const useAppStore = create<AppState>((set, get) => {
             ? playback.lastError
             : state.notice
       }));
+
+      // Listening stats + Recently played, recorded when a track ACTUALLY starts playing. Living
+      // here (not in playTrack) means queue auto-advance and next/previous skips count too —
+      // logging only manual plays badly undercounted top artists/tracks.
+      const current = playback.queue[playback.currentIndex];
+      if (current && playback.status === "playing") {
+        const key = getTrackKey(current);
+        if (key !== lastLoggedPlayKey) {
+          lastLoggedPlayKey = key;
+          recordPlay(current);
+          const nextRecentTracks = dedupeTracks([current, ...get().recentTracks]).slice(0, 12);
+          set({ recentTracks: nextRecentTracks });
+          void replaceRecentTracks(nextRecentTracks);
+        }
+      }
     });
 
     // Seed the engine with the saved master volume and provider trims. The engine re-applies the
@@ -1120,6 +1147,7 @@ export const useAppStore = create<AppState>((set, get) => {
     searchProvider: "all",
     searchQuery: "",
     searchResults: [],
+    searchStatus: "idle",
     playback: createEmptyPlaybackState(),
     shuffle: loadShuffle(),
     accentSource: loadAccentSource(),
@@ -1391,14 +1419,20 @@ export const useAppStore = create<AppState>((set, get) => {
     },
 
     async disconnectProvider(provider) {
-      if (provider === "soundcloud") {
-        // If this was a legacy browser sign-in, clear that stored SoundCloud web session too.
-        if (get().connections.soundcloud.metadata?.source === "web-session") {
-          await soundCloudWebSignOut();
+      try {
+        if (provider === "soundcloud") {
+          // If this was a legacy browser sign-in, clear that stored SoundCloud web session too.
+          if (get().connections.soundcloud.metadata?.source === "web-session") {
+            await soundCloudWebSignOut();
+          }
         }
+        await clearStoredProviderSessionBridge(provider);
+        await disconnectProviderRecord(provider);
+      } catch (error) {
+        // Still fall through to the local disconnect below — the UI must never stay stuck
+        // "connected" because an IPC hiccup kept the stored session from clearing.
+        set({ notice: getErrorMessage(error, `${providerNames[provider]} session cleanup failed.`) });
       }
-      await clearStoredProviderSessionBridge(provider);
-      await disconnectProviderRecord(provider);
       const runtime = await reloadDesktopRuntime();
       const nextConnections = {
         ...get().connections,
@@ -1605,11 +1639,15 @@ export const useAppStore = create<AppState>((set, get) => {
 
       if (!trimmedQuery) {
         if (requestId === activeSearchRequest) {
-          set({ searchResults: getDefaultSearchResults(get().projectTracks) });
+          set({
+            searchResults: getDefaultSearchResults(get().projectTracks),
+            searchStatus: "idle"
+          });
         }
         return;
       }
 
+      set({ searchStatus: "loading" });
       const targets = provider === "all" ? (["spotify", "soundcloud"] as Provider[]) : [provider];
       const catalogResults = dedupeTracks(
         get()
@@ -1619,6 +1657,7 @@ export const useAppStore = create<AppState>((set, get) => {
       );
 
       const results: UnifiedTrack[] = [...catalogResults];
+      let failedTargets = 0;
 
       for (const target of targets) {
         if (requestId !== activeSearchRequest) {
@@ -1628,12 +1667,15 @@ export const useAppStore = create<AppState>((set, get) => {
         // SoundCloud search works without OAuth (scraped public client_id) and Spotify
         // search uses an anonymous token, so we always try the live adapter below. On
         // failure we surface an honest error notice instead of inventing results.
+        const adapter = target === "spotify" ? spotifyAdapter : soundCloudAdapter;
+        if (!adapter) {
+          failedTargets += 1;
+          set({ notice: `${providerNames[target]} search isn't available right now.` });
+          continue;
+        }
 
         try {
-          const providerResults =
-            target === "spotify"
-              ? await spotifyAdapter?.search(trimmedQuery)
-              : await soundCloudAdapter?.search(trimmedQuery);
+          const providerResults = await adapter.search(trimmedQuery);
           if (requestId !== activeSearchRequest) {
             return;
           }
@@ -1643,6 +1685,7 @@ export const useAppStore = create<AppState>((set, get) => {
           if (requestId !== activeSearchRequest) {
             return;
           }
+          failedTargets += 1;
           set({
             notice:
               error instanceof Error
@@ -1653,8 +1696,18 @@ export const useAppStore = create<AppState>((set, get) => {
       }
 
       if (requestId === activeSearchRequest) {
-        set({ searchResults: dedupeTracks(results) });
+        const deduped = dedupeTracks(results);
+        set({
+          searchResults: deduped,
+          // "error" only when every provider failed AND nothing local matched — partial results
+          // still count as a successful search.
+          searchStatus: failedTargets === targets.length && deduped.length === 0 ? "error" : "ready"
+        });
       }
+    },
+
+    setSearchProvider(provider) {
+      set({ searchProvider: provider });
     },
 
     async createPlaylist(title) {
@@ -1742,19 +1795,21 @@ export const useAppStore = create<AppState>((set, get) => {
       const adapter = getProviderAdapter(provider);
       if (!adapter) {
         set({ notice: `Connect ${provider} to import playlists.` });
-        return;
+        return false;
       }
 
       try {
         const collection = await adapter.getCollectionTracks(collectionId);
         if (!collection.items.length) {
           set({ notice: "That playlist has no importable tracks yet." });
-          return;
+          return false;
         }
         const playlistId = await get().createPlaylist(title || collection.title || "Imported playlist");
         await get().addTracksToPlaylist(playlistId, collection.items);
+        return true;
       } catch (error) {
         set({ notice: error instanceof Error ? error.message : "Could not import that playlist." });
+        return false;
       }
     },
 
@@ -1975,24 +2030,20 @@ export const useAppStore = create<AppState>((set, get) => {
           ]
         : linkedQueue;
       const playIndex = shuffle ? 0 : startIndex;
-      const linkedTrack = playQueue[playIndex] ?? playQueue[0] ?? track;
 
       queueEngine.setQueue(playQueue, playIndex);
 
       try {
+        // Recently-played + listening stats are recorded centrally in the queue subscription (the
+        // first "playing" emit), so auto-advance and manual plays are counted the same way.
+        // Re-arm the de-dupe so deliberately replaying the SAME track still counts as a new play.
+        lastLoggedPlayKey = "";
         await queueEngine.playAt(playIndex);
       } catch (error) {
         set({
           notice: getErrorMessage(error, `Could not start ${providerNames[track.provider]} playback.`)
         });
-        return;
       }
-
-      const nextRecentTracks = dedupeTracks([linkedTrack, ...get().recentTracks]).slice(0, 12);
-      await replaceRecentTracks(nextRecentTracks);
-      set({ recentTracks: nextRecentTracks });
-      // Record the play for on-device listening stats (private — never leaves the machine).
-      recordPlay(linkedTrack);
     },
 
     async addToQueueNext(track) {
@@ -2046,10 +2097,20 @@ export const useAppStore = create<AppState>((set, get) => {
       queueEngine.removeAt(index);
     },
 
+    clearQueue() {
+      const { queue, currentIndex } = get().playback;
+      const current = queue[currentIndex];
+      if (!current || queue.length <= 1) {
+        return;
+      }
+      queueEngine.reorderQueue([current], 0);
+      set({ notice: "Queue cleared — current track keeps playing." });
+    },
+
     async generateDailyMixes(force = false) {
       // A build is already in flight (the Home mount effect can fire repeatedly during library
-      // sync) — don't kick off a second overlapping discovery pass.
-      if (!force && get().mixesStatus === "loading") {
+      // sync) — never kick off a second overlapping discovery pass, forced or not.
+      if (dailyMixesBuilding) {
         return;
       }
       const library = get().projectTracks.map((item) => item.track);
@@ -2066,41 +2127,59 @@ export const useAppStore = create<AppState>((set, get) => {
         return;
       }
 
+      dailyMixesBuilding = true;
       set({ mixesStatus: "loading" });
-      const ownedKeys = new Set(library.map(trackKey));
-      const clusters = topArtistClusters(library, 6, 2);
+      try {
+        const ownedKeys = new Set(library.map(trackKey));
+        const clusters = topArtistClusters(library, 6, 2);
 
-      // Discover SIMILAR artists for each anchor — not more of the same artist. SoundCloud's
-      // related-tracks endpoint is the discovery engine (it surfaces adjacent/underground artists).
-      // We pool related results from a few of the artist's songs, then drop the anchor artist itself,
-      // already-owned tracks, and over-represented neighbours so the mix is a real blend.
-      const discovered = new Map<string, UnifiedTrack[]>();
-      await Promise.all(
-        clusters.map(async (cluster) => {
-          // Seeds for related-tracks: the artist's own SoundCloud songs, or — if the cluster is
-          // Spotify-only — SoundCloud equivalents resolved by searching the artist name.
-          let seeds = cluster.tracks.filter((track) => track.provider === "soundcloud").slice(0, 3);
-          if (seeds.length === 0) {
-            const scHits = (await soundCloudAdapter?.search(cluster.artist).catch(() => [])) ?? [];
-            seeds = scHits.slice(0, 2);
-          }
-          const relatedPools = await Promise.all(
-            seeds.map((seed) => soundCloudAdapter?.relatedTracks(seed).catch(() => []) ?? [])
-          );
-          const pool = dedupeTracks(relatedPools.flat()).filter(
-            (track) => track.playable && !ownedKeys.has(trackKey(track))
-          );
-          discovered.set(cluster.artist, limitPerArtist(excludeArtist(pool, cluster.artist), 3));
-        })
-      );
+        // Discover SIMILAR artists for each anchor — not more of the same artist. SoundCloud's
+        // related-tracks endpoint is the discovery engine (it surfaces adjacent/underground artists).
+        // We pool related results from a few of the artist's songs, then drop the anchor artist itself,
+        // already-owned tracks, and over-represented neighbours so the mix is a real blend.
+        const discovered = new Map<string, UnifiedTrack[]>();
+        await Promise.all(
+          clusters.map(async (cluster) => {
+            // Seeds for related-tracks: the artist's own SoundCloud songs, or — if the cluster is
+            // Spotify-only — SoundCloud equivalents resolved by searching the artist name.
+            let seeds = cluster.tracks.filter((track) => track.provider === "soundcloud").slice(0, 3);
+            if (seeds.length === 0) {
+              const scHits = (await soundCloudAdapter?.search(cluster.artist).catch(() => [])) ?? [];
+              seeds = scHits.slice(0, 2);
+            }
+            const relatedPools = await Promise.all(
+              seeds.map((seed) => soundCloudAdapter?.relatedTracks(seed).catch(() => []) ?? [])
+            );
+            const pool = dedupeTracks(relatedPools.flat()).filter(
+              (track) => track.playable && !ownedKeys.has(trackKey(track))
+            );
+            discovered.set(cluster.artist, limitPerArtist(excludeArtist(pool, cluster.artist), 3));
+          })
+        );
 
-      const mixes = buildDailyMixes(library, { date: today, count: 6, size: 30, discovered });
-      set({ dailyMixes: mixes, dailyMixesDate: today, mixesStatus: "ready" });
+        const mixes = buildDailyMixes(library, { date: today, count: 6, size: 30, discovered });
+        set({ dailyMixes: mixes, dailyMixesDate: today, mixesStatus: "ready" });
+      } catch (error) {
+        // An unexpected throw used to leave mixesStatus stuck on "loading" (spinner forever).
+        set({
+          mixesStatus: "ready",
+          notice: getErrorMessage(error, "Couldn't build Daily Mixes right now.")
+        });
+      } finally {
+        dailyMixesBuilding = false;
+      }
     },
 
     async startStation(seed) {
+      // Station discovery is a multi-hop network fan-out — rapid double clicks used to launch
+      // overlapping builds that raced each other for lastStation/playback.
+      if (stationBuilding) {
+        return;
+      }
+      stationBuilding = true;
       ensurePlayback();
       set({ notice: `Building a station from "${seed.title}"…` });
+      try {
       // SoundCloud related-tracks is the only true similarity engine left (Spotify retired its
       // recommendations API). Resolve a SoundCloud "twin" of the seed, then expand TWO hops out:
       // related(seed), plus related() of a few artist-diverse first-hop tracks. That turns ~20
@@ -2264,6 +2343,11 @@ export const useAppStore = create<AppState>((set, get) => {
         mixId: station.id
       });
       set({ notice: `Station started from "${seed.title}".` });
+      } catch (error) {
+        set({ notice: getErrorMessage(error, `Couldn't build a station from "${seed.title}".`) });
+      } finally {
+        stationBuilding = false;
+      }
     },
 
     async enrichLibraryFeatures() {

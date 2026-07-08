@@ -44,6 +44,25 @@ export function VirtualList<T>({
     return () => observer.disconnect();
   }, []);
 
+  // When the item set shrinks below the current scroll offset (filter/chip change), snap the DOM
+  // scroll position back into range immediately — waiting for the browser's clamp scroll event
+  // briefly rendered bottom rows against the wrong offset. Gated on a genuine shrink and on the
+  // tracked scroll state, so no layout read (clientHeight/scrollTop) happens on ordinary renders.
+  const prevCountRef = useRef(items.length);
+  useLayoutEffect(() => {
+    const shrank = items.length < prevCountRef.current;
+    prevCountRef.current = items.length;
+    const element = containerRef.current;
+    if (!shrank || !element) {
+      return;
+    }
+    const maxTop = Math.max(0, items.length * rowHeight - element.clientHeight);
+    if (element.scrollTop > maxTop) {
+      element.scrollTop = maxTop;
+      setScrollTop(maxTop);
+    }
+  }, [items.length, rowHeight]);
+
   const totalHeight = items.length * rowHeight;
   const maxScrollTop = Math.max(0, totalHeight - viewportHeight);
   const clampedTop = Math.min(scrollTop, maxScrollTop);

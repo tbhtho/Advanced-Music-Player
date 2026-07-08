@@ -66,6 +66,7 @@ import {
   setDiscordPresence,
   setDiscordPresenceEnabled as pushDiscordPresenceEnabled,
   setDesktopCompactMode,
+  subscribeMediaKeys,
   type RuntimeInfo
 } from "@/lib/desktopBridge";
 import {
@@ -319,6 +320,64 @@ function DiscordPresenceSync() {
   return null;
 }
 
+/**
+ * Global transport hotkeys — Space play/pause, Ctrl/Cmd+→ next, Ctrl/Cmd+← previous — plus
+ * hardware media keys forwarded from the main process. Renders nothing.
+ */
+function PlaybackHotkeys() {
+  const togglePlayback = useAppStore((state) => state.togglePlayback);
+  const next = useAppStore((state) => state.next);
+  const previous = useAppStore((state) => state.previous);
+
+  useEffect(() => {
+    const isInteractiveTarget = (target: EventTarget | null) => {
+      const element = target as HTMLElement | null;
+      if (!element) {
+        return false;
+      }
+      // Buttons and role="button" cards keep their native Space activation; text fields keep
+      // typing. closest() covers focus landing on a child of an interactive wrapper.
+      return Boolean(
+        element.isContentEditable ||
+          element.closest?.('input, textarea, select, button, [role="button"], [contenteditable="true"]')
+      );
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (isInteractiveTarget(event.target)) {
+        return;
+      }
+      if (event.code === "Space") {
+        event.preventDefault();
+        void togglePlayback();
+      } else if ((event.ctrlKey || event.metaKey) && event.key === "ArrowRight") {
+        event.preventDefault();
+        void next();
+      } else if ((event.ctrlKey || event.metaKey) && event.key === "ArrowLeft") {
+        event.preventDefault();
+        void previous();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [togglePlayback, next, previous]);
+
+  useEffect(
+    () =>
+      subscribeMediaKeys((action) => {
+        if (action === "play-pause") {
+          void togglePlayback();
+        } else if (action === "next") {
+          void next();
+        } else {
+          void previous();
+        }
+      }),
+    [togglePlayback, next, previous]
+  );
+
+  return null;
+}
+
 function SongColor() {
   const artworkUrl = useAppStore(
     (state) => state.playback.queue[state.playback.currentIndex]?.artworkUrl
@@ -498,6 +557,7 @@ export function App() {
       <MotionConfig reducedMotion="user">
         <SongColor />
         <DiscordPresenceSync />
+        <PlaybackHotkeys />
         <MiniPlayer onExpand={exitCompact} />
       </MotionConfig>
     );
@@ -541,6 +601,7 @@ export function App() {
         <DesktopTitleBar visible={showCustomChrome} />
         <SongColor />
         <DiscordPresenceSync />
+        <PlaybackHotkeys />
         <div
           className={cn(
             "grid min-h-0 flex-1",
@@ -1051,12 +1112,27 @@ function PlayerBar({
   const [smoothPositionMs, setSmoothPositionMs] = useState(playback.positionMs);
   const smoothPositionRef = useRef(playback.positionMs);
   smoothPositionRef.current = smoothPositionMs;
+  // After a seek commit, polls from BEFORE the seek still arrive for a beat — accepting them made
+  // the scrubber visibly snap back to the old position until the next fresh poll.
+  const pendingSeekRef = useRef<{ target: number; at: number } | null>(null);
 
   useEffect(() => {
-    if (!isSeeking) {
-      setSeekDraft(playback.positionMs);
-      setSmoothPositionMs(playback.positionMs);
+    if (isSeeking) {
+      return;
     }
+    const pending = pendingSeekRef.current;
+    if (pending) {
+      const age = Date.now() - pending.at;
+      // Grace window: for ~one poll cycle after the seek, only accept polls that landed near the
+      // target — anything else is a pre-seek straggler (this also covers seeks smaller than the
+      // proximity threshold). Past the window, accept whatever the engine reports.
+      if (age < 2600 && Math.abs(playback.positionMs - pending.target) > 1500) {
+        return;
+      }
+      pendingSeekRef.current = null;
+    }
+    setSeekDraft(playback.positionMs);
+    setSmoothPositionMs(playback.positionMs);
   }, [isSeeking, playback.positionMs]);
 
   useEffect(() => {
@@ -1093,6 +1169,8 @@ function PlayerBar({
     const nextPositionMs = Math.max(0, Math.min(durationMs, value));
     setIsSeeking(false);
     setSeekDraft(nextPositionMs);
+    setSmoothPositionMs(nextPositionMs);
+    pendingSeekRef.current = { target: nextPositionMs, at: Date.now() };
     void seek(nextPositionMs);
   };
 
@@ -1101,6 +1179,17 @@ function PlayerBar({
     setIsVolumeSliding(false);
     setVolumeDraft(nextVolume);
     void setVolume(nextVolume);
+  };
+
+  // Mute toggle on the speaker icon: remembers the last audible level and restores it.
+  const lastAudibleVolumeRef = useRef(playback.volume > 0 ? playback.volume : 0.8);
+  if (volumeDraft > 0) {
+    lastAudibleVolumeRef.current = volumeDraft;
+  }
+  const toggleMute = () => {
+    const next = volumeDraft > 0 ? 0 : clampUnit(lastAudibleVolumeRef.current || 0.8);
+    setVolumeDraft(next);
+    void setVolume(next);
   };
 
   const getNextProviderVolumeDrafts = (
@@ -1203,10 +1292,14 @@ function PlayerBar({
             >
               <Shuffle className="h-3.5 w-3.5" />
             </button>
-            <TransportButton onClick={() => void previous()} disabled={!playback.canGoPrevious}>
+            <TransportButton onClick={() => void previous()} disabled={!playback.canGoPrevious} label="Previous">
               <SkipBack className="h-3.5 w-3.5" />
             </TransportButton>
-            <TransportButton onClick={() => void togglePlayback()} emphasis>
+            <TransportButton
+              onClick={() => void togglePlayback()}
+              emphasis
+              label={playback.status === "playing" ? "Pause" : "Play"}
+            >
               {playback.status === "playing" ? (
                 <Pause className="h-4 w-4 fill-current" />
               ) : (
@@ -1214,7 +1307,7 @@ function PlayerBar({
                 <Play className="h-4 w-4 translate-x-[1px] fill-current" />
               )}
             </TransportButton>
-            <TransportButton onClick={() => void next()} disabled={!playback.canGoNext}>
+            <TransportButton onClick={() => void next()} disabled={!playback.canGoNext} label="Next">
               <SkipForward className="h-3.5 w-3.5" />
             </TransportButton>
             <button
@@ -1255,6 +1348,8 @@ function PlayerBar({
               step={1000}
               value={displayedPosition}
               disabled={!currentTrack}
+              aria-label="Seek"
+              aria-valuetext={`${formatDuration(displayedPosition)} of ${formatDuration(playback.durationMs)}`}
               onPointerDown={() => setIsSeeking(true)}
               onChange={(event) => {
                 setIsSeeking(true);
@@ -1320,6 +1415,8 @@ function PlayerBar({
                           max={1}
                           step={0.01}
                           value={draft}
+                          aria-label={`${providerLabel(provider)} volume trim`}
+                          aria-valuetext={`${Math.round(draft * 100)}%`}
                           onPointerDown={() => setProviderVolumeSliding(provider)}
                           onChange={(event) => updateProviderVolumeDraft(provider, Number(event.target.value))}
                           onPointerUp={(event) =>
@@ -1346,17 +1443,23 @@ function PlayerBar({
             ) : null}
           </AnimatePresence>
 
-          {volumeDraft === 0 ? (
-            <VolumeX className="h-4 w-4 text-[var(--muted)]" />
-          ) : (
-            <Volume2 className="h-4 w-4 text-[var(--muted)]" />
-          )}
+          <button
+            type="button"
+            onClick={toggleMute}
+            title={volumeDraft === 0 ? "Unmute" : "Mute"}
+            aria-label={volumeDraft === 0 ? "Unmute" : "Mute"}
+            className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-[var(--muted)] transition hover:bg-white/5 hover:text-[var(--paper)]"
+          >
+            {volumeDraft === 0 ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+          </button>
           <input
             type="range"
             min={0}
             max={1}
             step={0.01}
             value={volumeDraft}
+            aria-label="Volume"
+            aria-valuetext={`${Math.round(volumeDraft * 100)}%`}
             onPointerDown={() => setIsVolumeSliding(true)}
             onChange={(event) => {
               const nextVolume = clampUnit(Number(event.target.value));
@@ -1529,6 +1632,7 @@ function NowPlayingPanel() {
   const playback = useAppStore((state) => state.playback);
   const playTrack = useAppStore((state) => state.playTrack);
   const reorderQueue = useAppStore((state) => state.reorderQueue);
+  const clearQueue = useAppStore((state) => state.clearQueue);
   const openTrackMenu = useAppStore((state) => state.openTrackMenu);
   const queueSource = useAppStore((state) => state.queueSource);
   const lastStation = useAppStore((state) => state.lastStation);
@@ -1616,9 +1720,24 @@ function NowPlayingPanel() {
         </div>
       )}
 
-      <p className="kicker mt-4 shrink-0">
-        Queue
-      </p>
+      <div className="mt-4 flex shrink-0 items-baseline justify-between gap-2">
+        <p className="kicker">
+          Queue
+          {playback.queue.length > 0 ? (
+            <span className="tnum ml-1.5 text-[var(--faint)]">{playback.queue.length}</span>
+          ) : null}
+        </p>
+        {playback.queue.length > 1 ? (
+          <button
+            type="button"
+            onClick={clearQueue}
+            title="Clear the queue (current track keeps playing)"
+            className="text-[11px] text-[var(--muted)] transition hover:text-[var(--warn)]"
+          >
+            Clear
+          </button>
+        ) : null}
+      </div>
       <div className="mt-2 min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
         {playback.queue.length === 0 ? (
           <p className="px-1 text-xs text-[var(--muted)]">Nothing queued.</p>
@@ -1684,12 +1803,14 @@ function TransportButton({
   children,
   emphasis,
   disabled,
-  onClick
+  onClick,
+  label
 }: {
   children: ReactNode;
   emphasis?: boolean;
   disabled?: boolean;
   onClick(): void;
+  label: string;
 }) {
   return (
     <motion.button
@@ -1697,6 +1818,8 @@ function TransportButton({
       data-motion
       disabled={disabled}
       onClick={onClick}
+      aria-label={label}
+      title={label}
       whileHover={disabled ? undefined : { scale: emphasis ? 1.07 : 1.05 }}
       whileTap={disabled ? undefined : { scale: 0.92 }}
       transition={spring.press}
@@ -1737,6 +1860,8 @@ function NoticeBanner() {
           transition={spring.toast}
           // Tint the toast with the current song colour so it sits in the background instead of
           // clashing with it (the app's whole backdrop is keyed off the same --song-rgb).
+          role="status"
+          aria-live="polite"
           className="mx-6 mt-4 rounded-[var(--radius-lg)] border px-4 py-3 text-sm text-[var(--paper)] backdrop-blur"
           style={{
             borderColor: "rgba(var(--song-rgb), 0.32)",
@@ -1745,7 +1870,7 @@ function NoticeBanner() {
           }}
         >
           <div className="flex items-center justify-between gap-4">
-            <span className="min-w-0 flex-1 truncate">{notice}</span>
+            <span className="min-w-0 flex-1 line-clamp-2">{notice}</span>
             <button
               type="button"
               onClick={clearNotice}
@@ -1844,6 +1969,80 @@ function Btn({
   );
 }
 
+/** ESC closes the active overlay — shared by every modal/dialog. */
+function useEscapeClose(active: boolean, onClose: () => void) {
+  // The callback lives in a ref so the listener attaches once per open, not once per render
+  // (callers pass inline lambdas whose identity changes every render).
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  useEffect(() => {
+    if (!active) {
+      return;
+    }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onCloseRef.current();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [active]);
+}
+
+/** Confirm modal for destructive actions (delete playlist, clear history, start over). */
+function ConfirmDialog({
+  open,
+  title,
+  body,
+  confirmLabel,
+  onCancel,
+  onConfirm
+}: {
+  open: boolean;
+  title: string;
+  body: string;
+  confirmLabel: string;
+  onCancel(): void;
+  onConfirm(): void;
+}) {
+  useEscapeClose(open, onCancel);
+  return (
+    <AnimatePresence>
+      {open ? (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={onCancel}
+          className="fixed inset-0 z-50 grid place-items-center bg-black/55 px-6 backdrop-blur-sm"
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.97, y: 12 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.97, y: 12 }}
+            transition={{ duration: 0.16 }}
+            role="dialog"
+            aria-modal="true"
+            onClick={(event) => event.stopPropagation()}
+            className="w-full max-w-md rounded-[var(--radius-xl)] border border-[var(--edge)] bg-[var(--panel-strong)] p-6 shadow-[0_28px_90px_rgba(0,0,0,0.38)]"
+          >
+            <h3 className="font-display text-2xl text-[var(--paper)]">{title}</h3>
+            <p className="mt-3 text-sm leading-6 text-[var(--muted)]">{body}</p>
+            <div className="mt-6 flex justify-end gap-3">
+              <Btn kind="ghost" onClick={onCancel}>
+                Cancel
+              </Btn>
+              <Btn kind="primary" onClick={onConfirm}>
+                {confirmLabel}
+              </Btn>
+            </div>
+          </motion.div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
+  );
+}
+
 /** Quiet empty states: ghost artwork skeletons inside tile grids, a single sentence elsewhere.
  *  Replaces the dashed-border centered boxes. */
 function EmptyState({
@@ -1856,7 +2055,8 @@ function EmptyState({
   if (variant === "grid") {
     return (
       <div>
-        <div aria-hidden="true" className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3">
+        {/* Matches the real tile grids (minmax 150px, gap-2.5) so content doesn't reflow when it lands. */}
+        <div aria-hidden="true" className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2.5">
           {Array.from({ length: 4 }, (_, i) => (
             <div key={i} className="aspect-square rounded-[var(--radius-lg)] bg-white/[0.03]" />
           ))}
@@ -1875,10 +2075,21 @@ function ConnectionPill({
   provider: Provider;
   status: "connected" | "disconnected" | "connecting" | "error";
 }) {
-  const connected = status === "connected";
-  const styles = connected
-    ? "bg-[var(--connect)]/15 text-[var(--connect)]"
-    : "bg-[var(--muted)]/15 text-[var(--muted)]";
+  // All four states read honestly — "connecting" used to show a spinner next to "Disconnected".
+  const styles =
+    status === "connected"
+      ? "bg-[var(--connect)]/15 text-[var(--connect)]"
+      : status === "error"
+        ? "bg-[var(--warn)]/15 text-[var(--warn)]"
+        : "bg-[var(--muted)]/15 text-[var(--muted)]";
+  const label =
+    status === "connected"
+      ? "Connected"
+      : status === "connecting"
+        ? "Connecting…"
+        : status === "error"
+          ? "Connection error"
+          : "Disconnected";
 
   return (
     <span
@@ -1888,7 +2099,7 @@ function ConnectionPill({
       )}
     >
       {status === "connecting" ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : null}
-      {status === "connected" ? "Connected" : "Disconnected"}
+      {label}
     </span>
   );
 }
@@ -1973,6 +2184,7 @@ function TrackGrid({
   spotifyLikedTrackIds?: Set<string>;
   onSpotifyLikeToggle?: (track: UnifiedTrack, liked: boolean) => void;
 }) {
+  const openTrackMenu = useAppStore((state) => state.openTrackMenu);
   return (
     <div className="grid gap-2.5 grid-cols-[repeat(auto-fill,minmax(155px,1fr))]">
       {tracks.map((track) => {
@@ -1999,6 +2211,10 @@ function TrackGrid({
         return (
           <div
             key={track.id}
+            onContextMenu={(event) => {
+              event.preventDefault();
+              openTrackMenu(track, event.clientX, event.clientY);
+            }}
             className="rounded-[var(--radius)] border border-[var(--edge)] bg-[var(--panel)] p-2.5 transition hover:-translate-y-0.5 hover:border-[var(--acid)]/40"
           >
             <ArtworkImage
@@ -2254,6 +2470,8 @@ function AddToPlaylistDialog({
     setCreating(false);
   }, [track?.id, multiTracks.length]);
 
+  useEscapeClose(Boolean(track) || isMulti, onClose);
+
   if (!track && !isMulti) {
     return null;
   }
@@ -2302,6 +2520,7 @@ function AddToPlaylistDialog({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={tween.quick}
+        onClick={onClose}
         className="fixed inset-0 z-[49] grid place-items-center bg-[var(--mat-scrim)] px-6 backdrop-blur-md"
       >
         <motion.div
@@ -2309,6 +2528,9 @@ function AddToPlaylistDialog({
           animate={modalVariants.animate}
           exit={modalVariants.exit}
           transition={spring.pop}
+          role="dialog"
+          aria-modal="true"
+          onClick={(event) => event.stopPropagation()}
           className="vibrancy glass-overlay z-[50] w-full max-w-md rounded-[var(--radius-xl)] p-5"
         >
           <div className="flex items-start justify-between gap-4">
@@ -2352,7 +2574,7 @@ function AddToPlaylistDialog({
                         {playlist.title}
                       </span>
                       <span className="text-xs text-[var(--muted)]">
-                        {added ? "Added" : busy ? "Adding..." : playlist.entries.length + " tracks"}
+                        {added ? "Added" : busy ? "Adding..." : `${playlist.entries.length} tracks`}
                       </span>
                     </span>
                   </button>
@@ -2393,7 +2615,9 @@ function AddToPlaylistDialog({
 }
 
 function MixCard({ mix, onOpen, onPlay }: { mix: HomeMix; onOpen(): void; onPlay(): void }) {
-  const tiles = mix.tracks.slice(0, 4);
+  // The 2×2 collage needs 4 covers — smaller mixes fall back to one full-bleed cover
+  // instead of rendering empty grid cells.
+  const tiles = mix.tracks.length >= 4 ? mix.tracks.slice(0, 4) : mix.tracks.slice(0, 1);
   return (
     <motion.div
       role="button"
@@ -2412,7 +2636,7 @@ function MixCard({ mix, onOpen, onPlay }: { mix: HomeMix; onOpen(): void; onPlay
       className="group cursor-pointer rounded-[var(--radius-lg)] p-2 text-left transition-colors hover:bg-white/[0.04]"
     >
       <div className="relative aspect-square w-full overflow-hidden rounded-[var(--radius)]">
-        <div className="grid h-full w-full grid-cols-2 grid-rows-2 gap-px">
+        <div className={cn("grid h-full w-full gap-px", tiles.length === 4 && "grid-cols-2 grid-rows-2")}>
           {tiles.map((track, index) => (
             <ArtworkImage
               key={`${track.id}-${index}`}
@@ -2484,12 +2708,16 @@ function HomePage() {
 
   return (
     <div className="space-y-4">
-      {dailyMixes.length > 0 || mixesStatus === "loading" ? (
+      {dailyMixes.length > 0 || mixesStatus === "loading" || (mixesStatus === "ready" && projectTracks.length >= 4) ? (
         <SectionCard>
           <SectionHeader
             title="Daily Mixes"
             action={
-              <Btn kind="ghost" onClick={() => void generateDailyMixes(true)}>
+              <Btn
+                kind="ghost"
+                disabled={mixesStatus === "loading"}
+                onClick={() => void generateDailyMixes(true)}
+              >
                 <RefreshCcw className={`h-3.5 w-3.5 ${mixesStatus === "loading" ? "animate-spin" : ""}`} />
                 Refresh
               </Btn>
@@ -2502,6 +2730,13 @@ function HomePage() {
             {dailyMixes.length === 0 && mixesStatus === "loading" ? (
               <div className="col-span-full">
                 <EmptyState variant="grid">Building your Daily Mixes…</EmptyState>
+              </div>
+            ) : dailyMixes.length === 0 ? (
+              <div className="col-span-full">
+                <EmptyState>
+                  No Daily Mixes yet — they need a few repeat artists in your library. Keep liking
+                  tracks and hit Refresh.
+                </EmptyState>
               </div>
             ) : (
               dailyMixes.map((mix) => (
@@ -2522,7 +2757,14 @@ function HomePage() {
         <p className="text-sm text-[var(--muted)]">
           Pick a song — AMP builds an endless station blending Spotify & SoundCloud.
         </p>
-        {lastStation ? (
+        {lastStation ? (() => {
+          const playLastStation = () =>
+            void playTrack(lastStation.tracks[0], lastStation.tracks, {
+              kind: "station",
+              label: lastStation.title,
+              mixId: lastStation.id
+            });
+          return (
           <button
             type="button"
             onClick={() => openMixDetail(lastStation)}
@@ -2537,19 +2779,29 @@ function HomePage() {
                 {lastStation.tracks.length} tracks — open the tracklist
               </span>
             </span>
-            <Play
-              className="h-4 w-4 shrink-0 text-[var(--muted)]"
+            <span
+              role="button"
+              tabIndex={0}
+              aria-label="Play station"
+              title="Play station"
               onClick={(event) => {
                 event.stopPropagation();
-                void playTrack(lastStation.tracks[0], lastStation.tracks, {
-                  kind: "station",
-                  label: lastStation.title,
-                  mixId: lastStation.id
-                });
+                playLastStation();
               }}
-            />
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  playLastStation();
+                }
+              }}
+              className="grid h-8 w-8 shrink-0 cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-white/10 hover:text-[var(--paper)]"
+            >
+              <Play className="h-4 w-4" />
+            </span>
           </button>
-        ) : null}
+          );
+        })() : null}
         <div className="mt-3 grid gap-2.5 grid-cols-[repeat(auto-fill,minmax(135px,1fr))]">
           {recentTracks.length === 0 ? (
             <div className="col-span-full">
@@ -2626,7 +2878,7 @@ function HomePage() {
               <EmptyState variant="grid">Nothing played yet. Search for a track and press play.</EmptyState>
             </div>
           ) : (
-            recentTracks.map((track) => (
+            recentTracks.slice(0, 12).map((track) => (
               <button
                 key={track.id}
                 type="button"
@@ -3179,6 +3431,8 @@ function SearchPage() {
   const spotifyLikedTrackIds = useAppStore((state) => state.spotifyLikedTrackIds);
   const playTrack = useAppStore((state) => state.playTrack);
   const storeProvider = useAppStore((state) => state.searchProvider);
+  const searchStatus = useAppStore((state) => state.searchStatus);
+  const setSearchProvider = useAppStore((state) => state.setSearchProvider);
   const [query, setQuery] = useState(useAppStore.getState().searchQuery);
   const [trackToAdd, setTrackToAdd] = useState<UnifiedTrack | undefined>();
   const deferredQuery = useDeferredValue(query);
@@ -3214,6 +3468,7 @@ function SearchPage() {
                     setQuery(event.target.value);
                   })
                 }
+                aria-label="Search Spotify and SoundCloud"
                 placeholder="Search Spotify and SoundCloud"
                 // shadow-none cancels the global input focus ring — the wrapper border is the focus cue here.
                 className="w-full bg-transparent text-sm text-[var(--paper)] outline-none focus:shadow-none focus-visible:shadow-none placeholder:text-[var(--muted)]"
@@ -3221,12 +3476,15 @@ function SearchPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2" role="group" aria-label="Search provider">
             {(["all", "spotify", "soundcloud"] as const).map((provider) => (
               <button
                 key={provider}
                 type="button"
-                onClick={() => void searchAction(query, provider)}
+                aria-pressed={storeProvider === provider}
+                // Only flip the provider — the debounced effect below re-runs the query once.
+                // Calling searchAction here too used to double-fire every chip click.
+                onClick={() => setSearchProvider(provider)}
                 className={cn(
                   "rounded-full px-4 py-2 text-sm font-medium transition",
                   storeProvider === provider
@@ -3243,7 +3501,20 @@ function SearchPage() {
 
       <SectionCard>
         {searchResults.length === 0 ? (
-          <EmptyState variant="grid">Type above to search Spotify and SoundCloud.</EmptyState>
+          searchStatus === "loading" ? (
+            <div className="flex items-center gap-2 py-8 text-sm text-[var(--muted)]">
+              <LoaderCircle className="h-4 w-4 animate-spin" /> Searching…
+            </div>
+          ) : searchStatus === "error" ? (
+            <div className="flex items-start gap-2 py-6 text-sm text-[var(--muted)]">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--warn)]" />
+              Search didn't go through — check your connection and try again.
+            </div>
+          ) : searchStatus === "ready" && query.trim() ? (
+            <EmptyState>No results for “{query.trim()}”. Try another spelling or switch providers.</EmptyState>
+          ) : (
+            <EmptyState variant="grid">Type above to search Spotify and SoundCloud.</EmptyState>
+          )
         ) : (
           <TrackGrid
             tracks={searchResults}
@@ -3489,9 +3760,13 @@ function LibraryPage() {
               <button
                 key={tab.id}
                 type="button"
+                aria-pressed={active}
                 onClick={() => {
                   setProviderFilter(tab.id);
                   setSelectedChip(null);
+                  // Selection is keyed to what's visible — keeping it across a scope switch would
+                  // let "Add to playlist" silently include tracks the new tab hides.
+                  exitSelection();
                 }}
                 className={cn(
                   "rounded-full border px-4 py-1.5 text-sm font-medium transition",
@@ -3523,6 +3798,7 @@ function LibraryPage() {
                 <button
                   key={chip.id}
                   type="button"
+                  aria-pressed={active}
                   onClick={() => setSelectedChip(active ? null : chip.id)}
                   className={cn(
                     "rounded-full border px-3 py-1 text-xs font-medium transition",
@@ -3560,6 +3836,7 @@ function LibraryPage() {
         <input
           value={filter}
           onChange={(event) => setFilter(event.target.value)}
+          aria-label="Search your library"
           placeholder="Search your library…"
           className="shrink-0 rounded-[var(--radius)] border border-[var(--edge)] bg-[var(--panel)] px-4 py-2.5 text-sm text-[var(--paper)] outline-none placeholder:text-[var(--muted)]"
         />
@@ -3596,6 +3873,17 @@ function LibraryPage() {
               />
             )}
           />
+        ) : librarySync.spotify.syncing || librarySync.soundcloud.syncing ? (
+          // Skeleton rows sized like real TrackListRows, so the list doesn't jump when tracks land.
+          <div aria-hidden className="min-h-0 flex-1 space-y-1.5 overflow-hidden pr-1">
+            {Array.from({ length: 8 }, (_, index) => (
+              <div
+                key={index}
+                className="h-[56px] animate-pulse rounded-[var(--radius)] bg-white/[0.03]"
+                style={{ animationDelay: `${index * 90}ms` }}
+              />
+            ))}
+          </div>
         ) : (
           <EmptyState>
             {query && scopedItems.length > 0
@@ -3604,9 +3892,7 @@ function LibraryPage() {
                 ? "No tracks match this filter yet."
               : providerFilter !== "all" && allItems.length > 0
                 ? `No ${providerFilter === "spotify" ? "Spotify" : "SoundCloud"} tracks in your library yet.`
-                : librarySync.spotify.syncing || librarySync.soundcloud.syncing
-                  ? "Loading your library…"
-                  : connections.spotify.status === "connected" || connections.soundcloud.status === "connected"
+                : connections.spotify.status === "connected" || connections.soundcloud.status === "connected"
                     ? "Your liked songs will appear here once they finish importing."
                     : "Connect Spotify or SoundCloud in Settings to load your liked songs. SoundCloud also plays without sign-in — just use Search."}
           </EmptyState>
@@ -3696,8 +3982,12 @@ function ProviderPlaylistImport({
     }
     setBusyId(collectionId);
     try {
-      await importCollectionAsPlaylist(provider, collectionId, title);
-      onImported();
+      // Only jump to the "Mine" tab when the import actually created a playlist — a failed
+      // import used to navigate away as if it had worked.
+      const imported = await importCollectionAsPlaylist(provider, collectionId, title);
+      if (imported) {
+        onImported();
+      }
     } finally {
       setBusyId(null);
     }
@@ -3764,6 +4054,7 @@ function PlaylistsPage() {
   const playPlaylist = useAppStore((state) => state.playPlaylist);
   const [draftTitle, setDraftTitle] = useState("");
   const [tab, setTab] = useState<PlaylistTab>("mine");
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const canSyncSoundCloudLikes =
     connections.soundcloud.status === "connected" &&
     (connections.soundcloud.metadata?.source === "web-session" || Boolean(connections.soundcloud.accessToken));
@@ -3854,9 +4145,14 @@ function PlaylistsPage() {
               <input
                 value={renameValue}
                 onChange={(event) => setRenameValue(event.target.value)}
+                aria-label="Playlist title"
                 onBlur={() => {
                   if (renameValue.trim() && renameValue !== activePlaylist.title) {
                     void renamePlaylist(activePlaylist.id, renameValue.trim());
+                  } else if (!renameValue.trim()) {
+                    // A blank title isn't saved — snap the field back so it doesn't sit empty
+                    // and out of sync with the real name.
+                    setRenameValue(activePlaylist.title);
                   }
                 }}
                 className="mt-3 w-full bg-transparent font-display text-4xl text-[var(--paper)] outline-none"
@@ -3866,7 +4162,7 @@ function PlaylistsPage() {
               <Btn kind="primary" onClick={() => void playPlaylist(activePlaylist.id)}>
                 Play queue
               </Btn>
-              <Btn kind="ghost" onClick={() => void deletePlaylist(activePlaylist.id)}>
+              <Btn kind="ghost" onClick={() => setConfirmDeleteId(activePlaylist.id)}>
                 Delete
               </Btn>
             </div>
@@ -3972,6 +4268,19 @@ function PlaylistsPage() {
       ) : (
         <ProviderPlaylistImport provider={tab} onImported={() => setTab("mine")} />
       )}
+      <ConfirmDialog
+        open={Boolean(confirmDeleteId)}
+        title="Delete playlist?"
+        body={`"${playlists.find((playlist) => playlist.id === confirmDeleteId)?.title ?? "This playlist"}" will be removed from AMP. The tracks stay in your library.`}
+        confirmLabel="Delete playlist"
+        onCancel={() => setConfirmDeleteId(null)}
+        onConfirm={() => {
+          if (confirmDeleteId) {
+            void deletePlaylist(confirmDeleteId);
+          }
+          setConfirmDeleteId(null);
+        }}
+      />
     </div>
   );
 }
@@ -4000,6 +4309,7 @@ function SoundCloudConnectCard({ onRequestOAuth }: { onRequestOAuth(): void }) {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<SoundCloudConnectView>("methods");
   const [selectedProfileId, setSelectedProfileId] = useState("");
+  useEscapeClose(open, () => setOpen(false));
 
   const isConnected = connection.status === "connected";
   const isLoading = connection.status === "connecting" || localStatus === "connecting" || localStatus === "syncing";
@@ -4658,6 +4968,7 @@ function AppearanceCard() {
           <button
             key={option.id}
             type="button"
+            aria-pressed={accentSource === option.id}
             onClick={() => {
               setAccentSource(option.id);
               if (option.id === "audio") {
@@ -4756,6 +5067,7 @@ function StatsPage() {
     return track ? `${track.provider}:${track.providerTrackId || track.id}` : "";
   });
   const [version, setVersion] = useState(0);
+  const [confirmClear, setConfirmClear] = useState(false);
   const stats: ListeningStats = useMemo(() => loadListeningStats(8), [currentKey, version]);
 
   if (stats.totalPlays === 0) {
@@ -4771,28 +5083,44 @@ function StatsPage() {
 
   const maxArtist = stats.topArtists[0]?.count ?? 1;
   const providerTotal = Math.max(1, stats.providerSplit.spotify + stats.providerSplit.soundcloud);
+  // Round one side and derive the other so the split always reads as exactly 100%.
+  const spotifyPct = Math.round((stats.providerSplit.spotify / providerTotal) * 100);
+  const soundcloudPct = 100 - spotifyPct;
+  const maxDay = Math.max(1, ...stats.days.map((day) => day.count));
 
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatTile label="Tracks played" value={stats.totalPlays.toLocaleString()} />
-        <StatTile label="This week" value={stats.weekPlays.toLocaleString()} />
-        <StatTile
-          label="Spotify"
-          value={`${Math.round((stats.providerSplit.spotify / providerTotal) * 100)}%`}
-          accent="var(--spotify-tint)"
-        />
-        <StatTile
-          label="SoundCloud"
-          value={`${Math.round((stats.providerSplit.soundcloud / providerTotal) * 100)}%`}
-          accent="var(--soundcloud-tint)"
-        />
+        <StatTile label="Last 7 days" value={stats.weekPlays.toLocaleString()} />
+        <StatTile label="Spotify" value={`${spotifyPct}%`} accent="var(--spotify-tint)" />
+        <StatTile label="SoundCloud" value={`${soundcloudPct}%`} accent="var(--soundcloud-tint)" />
       </div>
+
+      <SectionCard>
+        <SectionHeader title="Daily activity" />
+        <div className="flex h-28 items-end gap-2">
+          {stats.days.map((day) => (
+            <div key={day.label} className="flex min-w-0 flex-1 flex-col items-center gap-1.5">
+              <span className="tnum text-[10px] text-[var(--faint)]">{day.count > 0 ? day.count : ""}</span>
+              <div
+                title={`${day.count} play${day.count === 1 ? "" : "s"}`}
+                className="w-full max-w-10 rounded-t-[4px] bg-[var(--acid)]/80 transition-[height]"
+                style={{ height: `${Math.max(day.count > 0 ? 6 : 2, (day.count / maxDay) * 72)}px` }}
+              />
+              <span className="text-[10px] text-[var(--muted)]">{day.label}</span>
+            </div>
+          ))}
+        </div>
+      </SectionCard>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <SectionCard>
           <SectionHeader title="Top artists" />
           <div className="space-y-2.5">
+            {stats.topArtists.length === 0 ? (
+              <EmptyState>No artist data yet — plays without artist tags don't count here.</EmptyState>
+            ) : null}
             {stats.topArtists.map((artist, index) => (
               <div key={artist.artist} className="flex items-center gap-3">
                 <span className="w-4 shrink-0 text-right text-xs text-[var(--muted)]">{index + 1}</span>
@@ -4830,15 +5158,21 @@ function StatsPage() {
         </SectionCard>
       </div>
 
-      <Btn
-        kind="ghost"
-        onClick={() => {
-          clearListeningStats();
-          setVersion((value) => value + 1);
-        }}
-      >
+      <Btn kind="ghost" onClick={() => setConfirmClear(true)}>
         Clear history
       </Btn>
+      <ConfirmDialog
+        open={confirmClear}
+        title="Clear listening history?"
+        body="Your on-device play log — top artists, top tracks, and daily activity — will be wiped. This can't be undone."
+        confirmLabel="Clear history"
+        onCancel={() => setConfirmClear(false)}
+        onConfirm={() => {
+          clearListeningStats();
+          setVersion((value) => value + 1);
+          setConfirmClear(false);
+        }}
+      />
     </div>
   );
 }
@@ -4957,47 +5291,44 @@ function SettingsPage() {
                         <>
                           <Btn
                             kind="secondary"
+                            disabled={librarySync[provider].syncing}
                             onClick={() =>
-                              void refreshProviderConnection(provider).then(() => hydrateLibraries())
+                              // force=true: the connection signature is unchanged after a token
+                              // refresh, so an unforced hydrate returns early and syncs nothing.
+                              void refreshProviderConnection(provider)
+                                .then(() => hydrateLibraries(true))
+                                .catch(() => undefined)
                             }
                           >
-                            <RefreshCcw className="h-4 w-4" />
-                            Sync library
+                            <RefreshCcw
+                              className={cn("h-4 w-4", librarySync[provider].syncing && "animate-spin")}
+                            />
+                            {librarySync[provider].syncing ? "Syncing…" : "Sync library"}
                           </Btn>
                           <Btn kind="ghost" onClick={() => void disconnectProvider(provider)}>
                             Disconnect
                           </Btn>
                         </>
+                      ) : connection.status === "connecting" ? (
+                        <Btn
+                          kind="secondary"
+                          title="Cancel sign-in"
+                          onClick={() => void cancelConnectProvider(provider)}
+                        >
+                          Cancel
+                        </Btn>
                       ) : (
-                        <>
-                          {connection.status === "connecting" ? (
-                            <Btn
-                              kind="secondary"
-                              title="Cancel sign-in"
-                              onClick={() => void cancelConnectProvider(provider)}
-                            >
-                              Cancel
-                            </Btn>
-                          ) : (
-                            <Btn
-                              kind="primary"
-                              onClick={() => {
-                                if (providerConfig.ready) {
-                                  setConsentProvider(provider);
-                                }
-                              }}
-                              disabled={!providerConfig.ready}
-                            >
-                              {!providerConfig.ready
-                                ? provider === "soundcloud"
-                                  ? "No sign-in needed"
-                                  : "Sign-in unavailable"
-                                : provider === "spotify"
-                                  ? "Connect Spotify"
-                                  : "Connect SoundCloud"}
-                            </Btn>
-                          )}
-                        </>
+                        <Btn
+                          kind="primary"
+                          onClick={() => {
+                            if (providerConfig.ready) {
+                              setConsentProvider(provider);
+                            }
+                          }}
+                          disabled={!providerConfig.ready}
+                        >
+                          {providerConfig.ready ? "Connect Spotify" : "Sign-in unavailable"}
+                        </Btn>
                       )}
                     </div>
                   </div>
@@ -5148,44 +5479,17 @@ function SettingsPage() {
         }}
       />
 
-      <AnimatePresence>
-        {confirmRestart ? (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 grid place-items-center bg-black/55 px-6 backdrop-blur-sm"
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.97, y: 12 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.97, y: 12 }}
-              transition={{ duration: 0.16 }}
-              className="w-full max-w-md rounded-[var(--radius-xl)] border border-[var(--edge)] bg-[var(--panel-strong)] p-6 shadow-[0_28px_90px_rgba(0,0,0,0.38)]"
-            >
-              <h3 className="font-display text-2xl text-[var(--paper)]">Start over?</h3>
-              <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
-                Disconnects Spotify and SoundCloud and reopens the welcome setup. Imported tracks
-                and playlists stay in AMP.
-              </p>
-              <div className="mt-6 flex justify-end gap-3">
-                <Btn kind="ghost" onClick={() => setConfirmRestart(false)}>
-                  Cancel
-                </Btn>
-                <Btn
-                  kind="primary"
-                  onClick={() => {
-                    setConfirmRestart(false);
-                    void restartOnboarding();
-                  }}
-                >
-                  Disconnect &amp; start over
-                </Btn>
-              </div>
-            </motion.div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
+      <ConfirmDialog
+        open={confirmRestart}
+        title="Start over?"
+        body="Disconnects Spotify and SoundCloud and reopens the welcome setup. Imported tracks and playlists stay in AMP."
+        confirmLabel="Disconnect & start over"
+        onCancel={() => setConfirmRestart(false)}
+        onConfirm={() => {
+          setConfirmRestart(false);
+          void restartOnboarding();
+        }}
+      />
     </>
   );
 }
@@ -5199,11 +5503,15 @@ function ProviderConsentDialog({
   onClose(): void;
   onConfirm(provider: Provider): void;
 }) {
+  // Hooks BEFORE the early return — bailing out first changed the hook count between renders
+  // (0 hooks closed → 1 open), which is a hard React crash the moment the dialog opens.
+  const runtime = useAppStore((state) => state.runtime);
+  useEscapeClose(Boolean(provider), onClose);
+
   if (!provider) {
     return null;
   }
 
-  const runtime = useAppStore((state) => state.runtime);
   const copy = providerConsentCopy[provider];
   const providerConfig = getProviderConfigStatus(runtime, provider);
   const providerRuntime = runtime?.oauth[provider];
@@ -5215,6 +5523,7 @@ function ProviderConsentDialog({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={tween.quick}
+        onClick={onClose}
         className="fixed inset-0 z-[49] grid place-items-center bg-[var(--mat-scrim)] px-6 backdrop-blur-md"
       >
         <motion.div
@@ -5222,6 +5531,9 @@ function ProviderConsentDialog({
           animate={modalVariants.animate}
           exit={modalVariants.exit}
           transition={spring.pop}
+          role="dialog"
+          aria-modal="true"
+          onClick={(event) => event.stopPropagation()}
           className="vibrancy glass-overlay z-[50] w-full max-w-2xl rounded-[var(--radius-xl)] p-6"
         >
           <div className="flex items-start justify-between gap-4">

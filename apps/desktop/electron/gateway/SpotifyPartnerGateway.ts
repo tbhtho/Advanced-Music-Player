@@ -659,7 +659,9 @@ export class SpotifyPartnerGateway {
         clientToken: clientToken ?? "",
         deviceId,
         clientVersion,
-        expiresAt: Date.now() + ANONYMOUS_SESSION_TTL_MS
+        // A session without a client token is degraded — expire it quickly so a transient
+        // client-token fetch failure doesn't pin token-less requests for the full TTL.
+        expiresAt: Date.now() + (clientToken ? ANONYMOUS_SESSION_TTL_MS : 5 * 60_000)
       };
 
       this.anonymousSession = session;
@@ -832,13 +834,12 @@ export class SpotifyPartnerGateway {
       }
     } catch {
       // If discovery fails, fall back to well-known hashes
-      this.seedWellKnownHashes();
     }
 
-    // Always ensure we have at least well-known hashes
-    if (this.operationHashes.size === 0) {
-      this.seedWellKnownHashes();
-    }
+    // Merge well-known hashes for any operation discovery didn't find — a PARTIAL discovery
+    // (e.g. searchDesktop found, fetchPlaylist missing) used to skip seeding entirely and the
+    // missing operations failed with "Missing operation hash".
+    this.seedWellKnownHashes();
   }
 
   private extractJsUrls(html: string, baseUrl: string): string[] {
@@ -894,15 +895,14 @@ export class SpotifyPartnerGateway {
   private seedWellKnownHashes(): void {
     // These are community-documented hashes for the Spotify Partner API.
     // They may need updating as Spotify evolves their web app.
+    // (fetchLibraryTracks/fetchUserPlaylists previously carried 65-char placeholder values —
+    // not real sha256 hashes — which turned a clean "Missing operation hash" error into a
+    // confusing bogus request, so they were removed.)
     const wellKnown: Record<string, string> = {
       searchDesktop:
         "dfd9874bab4757583f1327e0909b466789d5bd4f8e053232c2c85a2e8be4bb02",
       fetchPlaylist:
-        "19ff1327c475e0615a4e836518fed44666b8f896a343ca95d25e3e9b8f0f1a15",
-      fetchLibraryTracks:
-        "7c8e3a32446a9b038ad9f6f114c74f43c21fa17c7f6e7b3a0c0e1d2f3a4b5c6d7",
-      fetchUserPlaylists:
-        "c62e2fb474c163b7d4d91d03df084df8a3d3c5e6f7a8b9c0d1e2f3a4b5c6d7e8f"
+        "19ff1327c475e0615a4e836518fed44666b8f896a343ca95d25e3e9b8f0f1a15"
     };
 
     for (const [name, hash] of Object.entries(wellKnown)) {

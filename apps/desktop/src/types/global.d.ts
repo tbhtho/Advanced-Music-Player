@@ -151,6 +151,9 @@ interface SpotCloudBridge {
   artwork: {
     resolve(request: { artworkUrl?: string; cacheKey?: string }): Promise<ResolvedArtwork>;
   };
+  media: {
+    onMediaKey(callback: (action: "play-pause" | "next" | "previous") => void): () => void;
+  };
   windowControls: {
     getState(): Promise<DesktopWindowState>;
     finishStartup(): Promise<DesktopWindowState>;

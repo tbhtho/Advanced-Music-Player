@@ -66,6 +66,11 @@ export class ProviderGateway {
     return this.soundcloud.resolveClientId();
   }
 
+  /** Persist pending cache writes immediately (sync) — called on quit so the debounce doesn't drop them. */
+  flushCache(): void {
+    this.cache.flushNow();
+  }
+
   invalidateProviderCache(provider: "spotify" | "soundcloud" | "all"): void {
     if (provider === "all") {
       this.cache.invalidate();

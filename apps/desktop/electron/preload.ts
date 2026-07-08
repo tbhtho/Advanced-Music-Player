@@ -73,6 +73,15 @@ contextBridge.exposeInMainWorld("spotCloud", {
     resolve: (request: { artworkUrl?: string; cacheKey?: string }) =>
       ipcRenderer.invoke("spot-cloud:resolve-artwork", request)
   },
+  media: {
+    // Hardware media keys (play/pause/next/previous), forwarded from the main process.
+    onMediaKey: (callback: (action: "play-pause" | "next" | "previous") => void) => {
+      const listener = (_event: unknown, action: "play-pause" | "next" | "previous") =>
+        callback(action);
+      ipcRenderer.on("spot-cloud:media-key", listener);
+      return () => ipcRenderer.removeListener("spot-cloud:media-key", listener);
+    }
+  },
   windowControls: {
     getState: () => ipcRenderer.invoke("spot-cloud:get-window-state"),
     finishStartup: () => ipcRenderer.invoke("spot-cloud:finish-startup-window"),

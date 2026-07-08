@@ -72,7 +72,13 @@ function writeJson<T>(key: string, value: T): void {
     return;
   }
 
-  window.localStorage.setItem(key, JSON.stringify(value));
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch (error) {
+    // Most likely QuotaExceededError on a very large library. Throwing here used to abort the
+    // caller (add/import/like) midway — a skipped persist is the lesser failure, so log and move on.
+    console.warn(`Persist failed for "${key}"`, error);
+  }
 }
 
 function hydrateTrackSnapshot(track: UnifiedTrack, projectTrackId?: string | null): UnifiedTrack {
@@ -360,6 +366,8 @@ export interface ListeningStats {
   providerSplit: { spotify: number; soundcloud: number };
   topArtists: Array<{ artist: string; count: number }>;
   topTracks: Array<{ key: string; title: string; artist: string; provider: Provider; count: number }>;
+  /** Plays per calendar day for the last 7 days, oldest first (label = short weekday name). */
+  days: Array<{ label: string; count: number }>;
 }
 
 function playEventArtist(track: UnifiedTrack): string {
@@ -388,6 +396,22 @@ export function loadListeningStats(topN = 8): ListeningStats {
   const providerSplit = { spotify: 0, soundcloud: 0 };
   let weekPlays = 0;
 
+  // Last 7 calendar days (local time), oldest first, so the Stats page can chart daily activity.
+  const dayFormatter = new Intl.DateTimeFormat("en-US", { weekday: "short" });
+  const days: Array<{ label: string; count: number; start: number; end: number }> = [];
+  for (let offset = 6; offset >= 0; offset -= 1) {
+    const day = new Date();
+    day.setHours(0, 0, 0, 0);
+    day.setDate(day.getDate() - offset);
+    const start = day.getTime();
+    days.push({
+      label: offset === 0 ? "Today" : dayFormatter.format(day),
+      count: 0,
+      start,
+      end: start + 24 * 60 * 60 * 1000
+    });
+  }
+
   for (const event of log) {
     artists.set(event.artist, (artists.get(event.artist) ?? 0) + 1);
     const existing = tracks.get(event.key);
@@ -401,6 +425,10 @@ export function loadListeningStats(topN = 8): ListeningStats {
     }
     if (event.at >= weekAgo) {
       weekPlays += 1;
+      const day = days.find((entry) => event.at >= entry.start && event.at < entry.end);
+      if (day) {
+        day.count += 1;
+      }
     }
   }
 
@@ -415,7 +443,14 @@ export function loadListeningStats(topN = 8): ListeningStats {
     .sort((a, b) => b.count - a.count || a.title.localeCompare(b.title))
     .slice(0, topN);
 
-  return { totalPlays: log.length, weekPlays, providerSplit, topArtists, topTracks };
+  return {
+    totalPlays: log.length,
+    weekPlays,
+    providerSplit,
+    topArtists,
+    topTracks,
+    days: days.map(({ label, count }) => ({ label, count }))
+  };
 }
 
 /** Wipe the on-device listening history. */

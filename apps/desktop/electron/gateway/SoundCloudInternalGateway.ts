@@ -11,15 +11,24 @@ import type { CacheStore } from "./CacheStore";
 import type { GatewayResponse } from "./types";
 import { StealthClient } from "./StealthClient";
 import { resolveMediaInPage, probeNativePlaybackOnce } from "../SoundCloudResolverWindow";
-import { appendFileSync } from "node:fs";
+import { appendFileSync, statSync, unlinkSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
 const RESOLVE_LOG_PATH = path.join(process.env.TEMP ?? os.tmpdir(), "amp-soundcloud-resolve.log");
+// Sync file I/O on the stream-resolve hot path is debug tooling — opt in via env var.
+const RESOLVE_LOG_ENABLED = process.env.AMP_DEBUG_RESOLVE_LOG === "1";
+const RESOLVE_LOG_MAX_BYTES = 2 * 1024 * 1024;
 
 function logResolve(message: string, data?: unknown): void {
+  if (!RESOLVE_LOG_ENABLED) {
+    return;
+  }
   const line = `[${new Date().toISOString()}] ${message}${data ? ` | ${JSON.stringify(data)}` : ""}\n`;
   try {
+    if ((statSync(RESOLVE_LOG_PATH, { throwIfNoEntry: false })?.size ?? 0) > RESOLVE_LOG_MAX_BYTES) {
+      unlinkSync(RESOLVE_LOG_PATH);
+    }
     appendFileSync(RESOLVE_LOG_PATH, line, "utf8");
   } catch {
     // ignore
@@ -180,7 +189,10 @@ export class SoundCloudInternalGateway {
   }
 
   async search(query: string): Promise<GatewayResponse<UnifiedTrack[]>> {
-    const cacheKey = `soundcloud:search:${query.trim().toLowerCase()}`;
+    // One canonical query string for BOTH the cache key and the request, so "song " and "song"
+    // hit the same cache entry instead of firing separate API variants.
+    const normalizedQuery = query.trim();
+    const cacheKey = `soundcloud:search:${normalizedQuery.toLowerCase()}`;
     const cached = this.cache.get<UnifiedTrack[]>(cacheKey);
     if (cached) {
       return { ok: true, data: cached, source: "cache" };
@@ -197,7 +209,7 @@ export class SoundCloudInternalGateway {
     try {
       const bundle = await this.ensureAssetBundle();
       const url = new URL(`${SOUNDCLOUD_PUBLIC_API_BASE}/search/tracks`);
-      url.searchParams.set("q", query);
+      url.searchParams.set("q", normalizedQuery);
       url.searchParams.set("limit", "18");
       url.searchParams.set("linked_partitioning", "1");
       url.searchParams.set("client_id", bundle.clientId);
@@ -932,6 +944,11 @@ export class SoundCloudInternalGateway {
       const me = JSON.parse(response.body) as SoundCloudInternalUser;
       const id = Number(me.id);
       if (Number.isFinite(id)) {
+        // Keyed by the full Authorization header, so token rotation would grow this forever —
+        // it's a one-user cache, keep only the most recent entry.
+        if (this.authenticatedUserIds.size >= 4) {
+          this.authenticatedUserIds.clear();
+        }
         this.authenticatedUserIds.set(authorizationHeader, id);
         return id;
       }
@@ -1063,7 +1080,10 @@ export class SoundCloudInternalGateway {
     this.bundlePromise = this.discoverAssetBundle();
     try {
       const bundle = await this.bundlePromise;
-      this.assetBundle = bundle;
+      // Never cache the empty-clientId fallback as "fresh" — doing so made every SoundCloud call
+      // fail for the whole 30-min TTL after one bad startup scrape. Marking it already-expired
+      // keeps this call's result usable as a last resort while forcing the next call to re-scrape.
+      this.assetBundle = bundle.clientId ? bundle : { ...bundle, fetchedAt: 0 };
       return bundle;
     } finally {
       this.bundlePromise = undefined;

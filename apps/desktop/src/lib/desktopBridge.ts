@@ -217,6 +217,16 @@ export async function resolveArtwork(request: {
   return window.spotCloud!.artwork.resolve(request);
 }
 
+/** Subscribe to hardware media-key presses (play/pause/next/previous). No-op in the browser. */
+export function subscribeMediaKeys(
+  callback: (action: "play-pause" | "next" | "previous") => void
+): () => void {
+  if (!hasDesktopBridge() || !window.spotCloud?.media) {
+    return () => undefined;
+  }
+  return window.spotCloud.media.onMediaKey(callback);
+}
+
 export async function getDesktopWindowState(): Promise<DesktopWindowState> {
   if (!hasDesktopBridge()) {
     return {

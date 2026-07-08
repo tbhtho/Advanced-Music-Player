@@ -170,11 +170,15 @@ button:not(:disabled):not([data-motion]):active,
   transform: scale(0.97);
 }
 
-/* ---- Keyboard focus: a subtle ring only where you type. Nav and buttons rely on their own
-   hover/active styling, so clicking around never leaves a stray outline behind. ---- */
+/* ---- Keyboard focus: a subtle ring wherever focus lands. :focus-visible only fires for
+   keyboard/AT focus, so clicking around never leaves a stray outline behind — but Tab users
+   always see where they are (buttons and nav previously had NO focus indicator at all). ---- */
 input:focus-visible,
 textarea:focus-visible,
-select:focus-visible {
+select:focus-visible,
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px rgba(var(--song-rgb), 0.4);
 }
