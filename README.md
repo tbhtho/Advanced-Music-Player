@@ -16,6 +16,12 @@ Search Spotify and SoundCloud together, build playlists that mix both, and play 
 
 No crossfade — the Spotify SDK can't do it honestly, so it's left out.
 
+## Download
+
+Grab the latest Windows installer (`AMP Setup x.y.z.exe`) from the
+[**Releases** page](https://github.com/alesxxxx/Advanced-Music-Player/releases/latest). Release
+builds are VMP-signed, so encrypted SoundCloud tracks play out of the box.
+
 ## Run it
 
 ```bash
