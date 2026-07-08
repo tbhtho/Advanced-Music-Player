@@ -102,11 +102,8 @@ import {
 } from "@/lib/trackFeatures";
 import { SoundCloudPlaybackAdapter } from "@/lib/providers/soundcloudAdapter";
 import { createSpotifyAdapter } from "@/lib/providers/createSpotifyAdapter";
-import {
-  createLocalAdapter,
-  createYouTubeAdapter,
-  type HtmlAudioAdapter
-} from "@/lib/providers/htmlAudioAdapter";
+import { createLocalAdapter, type HtmlAudioAdapter } from "@/lib/providers/htmlAudioAdapter";
+import { YouTubeIframeAdapter } from "@/lib/providers/youtubeIframeAdapter";
 import {
   addLocalMusicFolder,
   listLocalMusicFolders,
@@ -588,7 +585,7 @@ export const useAppStore = create<AppState>((set, get) => {
   let lastLibraryHydrateSignature = "";
   let spotifyAdapter: SpotifyBaseAdapter | null = null;
   let soundCloudAdapter: SoundCloudPlaybackAdapter | null = null;
-  let youTubeAdapter: HtmlAudioAdapter | null = null;
+  let youTubeAdapter: YouTubeIframeAdapter | null = null;
   let localAdapter: HtmlAudioAdapter | null = null;
   // De-dupes play logging in the queue subscription (a track emits "playing" many times).
   let lastLoggedPlayKey = "";
@@ -745,7 +742,7 @@ export const useAppStore = create<AppState>((set, get) => {
       }
     });
 
-    youTubeAdapter = createYouTubeAdapter(initialVolume * initialProviderVolumes.youtube);
+    youTubeAdapter = new YouTubeIframeAdapter(initialVolume * initialProviderVolumes.youtube);
     localAdapter = createLocalAdapter(initialVolume * initialProviderVolumes.local);
 
     queueEngine.registerAdapter(spotifyAdapter);

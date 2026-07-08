@@ -27,6 +27,7 @@ import { fileURLToPath, pathToFileURL, URL } from "node:url";
 import type { ProviderCollection, UnifiedTrack } from "@amp/core";
 import { ProviderGateway, type GatewayResponse } from "./gateway/index.js";
 import { LocalMusicManager } from "./localMusic.js";
+import { ensureYouTubePlayerOrigin, stopYouTubePlayerServer } from "./youtubePlayer.js";
 import { readDecryptedCookies, KeychainAccessError } from "./chromiumCookies.js";
 import {
   readChromiumCookiesViaRemoteDebugging,
@@ -210,16 +211,13 @@ interface JsonErrorBody {
 
 const isDev = !!process.env.VITE_DEV_SERVER_URL;
 
-// Custom media schemes for local files and proxied YouTube audio. MUST be registered before app
-// ready. `stream` + `supportFetchAPI` let <audio> issue ranged requests against them; `secure` +
-// `standard` make them first-class origins so media playback and seeking work like http(s).
+// Custom media scheme for local files. MUST be registered before app ready. `stream` +
+// `supportFetchAPI` let <audio> issue ranged requests against it; `secure` + `standard` make it a
+// first-class origin so media playback and seeking work like http(s). (YouTube plays through the
+// official IFrame player in the renderer, so it needs no custom protocol.)
 protocol.registerSchemesAsPrivileged([
   {
     scheme: "amp-local",
-    privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, bypassCSP: true }
-  },
-  {
-    scheme: "amp-stream",
     privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, bypassCSP: true }
   }
 ]);
@@ -3505,6 +3503,8 @@ app.whenReady().then(async () => {
   localMusicManager = new LocalMusicManager(app.getPath("userData"));
   void localMusicManager.initialize().catch((error) => logStartup("local-music:init-failed", error));
   registerMediaProtocols();
+  // Warm the YouTube player host so the first YT play is instant.
+  void ensureYouTubePlayerOrigin().catch((error) => logStartup("youtube-player:warm-failed", error));
 
   // castLabs ECS (electron-releases +wvcus) installs the Widevine CDM on demand through the
   // components service. It MUST be ready BEFORE the BrowserWindow loads any EME content, otherwise
@@ -3554,6 +3554,7 @@ app.on("before-quit", () => {
   isQuitting = true;
   discordPresence.stop();
   globalShortcut.unregisterAll();
+  stopYouTubePlayerServer();
   // Persist pending gateway-cache writes now — the 2s debounce alone drops them on quit.
   // Synchronous on purpose: an async write started here can be cut off when the process exits.
   providerGateway?.flushCache();
@@ -3713,25 +3714,7 @@ ipcMain.handle("spot-cloud:open-devtools", async () => {
   }
 });
 
-/** Parse an HTTP Range header ("bytes=START-END") into a start/optional-end pair. */
-function parseRangeHeader(header: string | null): { start: number; end?: number } | undefined {
-  if (!header) {
-    return undefined;
-  }
-  const match = /^bytes=(\d+)-(\d*)$/.exec(header.trim());
-  if (!match) {
-    return undefined;
-  }
-  const start = Number(match[1]);
-  const end = match[2] ? Number(match[2]) : undefined;
-  if (!Number.isFinite(start) || (end !== undefined && (!Number.isFinite(end) || end < start))) {
-    return undefined;
-  }
-  return { start, end };
-}
-
-// Custom media protocol handlers. amp-local serves whitelisted local audio + extracted artwork;
-// amp-stream proxies YouTube audio resolved by the gateway (bytes never touch the renderer as a URL).
+// Custom media protocol handler: amp-local serves whitelisted local audio + extracted artwork.
 function registerMediaProtocols(): void {
   protocol.handle("amp-local", async (request) => {
     try {
@@ -3755,37 +3738,6 @@ function registerMediaProtocols(): void {
     } catch (error) {
       logStartup("amp-local:error", error);
       return new Response("Local media error", { status: 500 });
-    }
-  });
-
-  protocol.handle("amp-stream", async (request) => {
-    try {
-      const url = new URL(request.url);
-      if (url.hostname !== "youtube") {
-        return new Response("Not found", { status: 404 });
-      }
-      const videoId = decodeURIComponent(url.pathname.replace(/^\//, ""));
-      if (!providerGateway || !videoId) {
-        return new Response("Not found", { status: 404 });
-      }
-      const range = parseRangeHeader(request.headers.get("range"));
-      const { webStream, mimeType, totalBytes, servedRange, contentLength } =
-        await providerGateway.getYouTubeStream(videoId, range);
-      const headers = new Headers({ "Content-Type": mimeType, "Accept-Ranges": "bytes" });
-      if (contentLength != null) {
-        headers.set("Content-Length", String(contentLength));
-      }
-      // 206 ONLY when the gateway actually served a byte range (it declines ranges it can't bound,
-      // returning the full body instead — answering 200 there keeps the body and status consistent).
-      let status = 200;
-      if (servedRange && totalBytes) {
-        headers.set("Content-Range", `bytes ${servedRange.start}-${servedRange.end}/${totalBytes}`);
-        status = 206;
-      }
-      return new Response(webStream, { status, headers });
-    } catch (error) {
-      logStartup("amp-stream:error", error);
-      return new Response("Stream error", { status: 502 });
     }
   });
 }
@@ -3906,6 +3858,17 @@ ipcMain.handle("spot-cloud:local-music-scan", async () => {
       error: error instanceof Error ? error.message : "Local music scan failed.",
       tracks: [] as UnifiedTrack[]
     };
+  }
+});
+
+// The loopback origin hosting the YouTube IFrame player page. The renderer embeds it in a hidden
+// iframe (the YT player won't init from the file:// renderer origin, but works from http://127.0.0.1).
+ipcMain.handle("spot-cloud:youtube-player-origin", async () => {
+  try {
+    return await ensureYouTubePlayerOrigin();
+  } catch (error) {
+    logStartup("youtube-player:server-failed", error);
+    return undefined;
   }
 });
 

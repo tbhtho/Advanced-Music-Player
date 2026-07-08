@@ -228,6 +228,15 @@ export function subscribeMediaKeys(
   return window.spotCloud.media.onMediaKey(callback);
 }
 
+// ── YouTube ────────────────────────────────────────────────────────────────────────────────────
+/** Loopback origin hosting the YouTube IFrame player page (the renderer embeds it via iframe). */
+export async function getYouTubePlayerOrigin(): Promise<string | undefined> {
+  if (!hasDesktopBridge() || !window.spotCloud?.youtube) {
+    return undefined;
+  }
+  return window.spotCloud.youtube.getPlayerOrigin();
+}
+
 // ── Local music ────────────────────────────────────────────────────────────────────────────────
 export async function listLocalMusicFolders(): Promise<string[]> {
   if (!hasDesktopBridge() || !window.spotCloud?.localMusic) {

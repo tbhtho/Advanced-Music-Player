@@ -17,8 +17,9 @@ Search Spotify and SoundCloud together, build playlists that mix both, and play 
 
 No crossfade — the Spotify SDK can't do it honestly, so it's left out.
 
-> YouTube playback uses unofficial stream extraction, so it can be flaky and may break when YouTube
-> changes things — treat it as best-effort. Local files and the other providers are unaffected.
+> YouTube plays through YouTube's official embedded player (like YTMDesktop), so it's reliable — but
+> that means ads play on a non-Premium account, and the occasional video that disallows embedding is
+> skipped. Local files and the other providers are unaffected.
 
 ## Download
 

@@ -30,11 +30,6 @@ export class ProviderGateway {
     await Promise.all([this.spotify.initialize(), this.soundcloud.initialize()]);
   }
 
-  /** Resolve a YouTube audio stream for the amp-stream:// protocol handler (main process only). */
-  getYouTubeStream(videoId: string, range?: { start: number; end?: number }) {
-    return this.youtube.getStream(videoId, range);
-  }
-
   async request(req: GatewayRequest): Promise<GatewayResponse> {
     switch (req.provider) {
       case "spotify":

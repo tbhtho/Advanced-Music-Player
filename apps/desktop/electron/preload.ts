@@ -64,6 +64,9 @@ contextBridge.exposeInMainWorld("spotCloud", {
   spotify: {
     getAnonymousSession: () => ipcRenderer.invoke("spot-cloud:get-anonymous-spotify-session")
   },
+  youtube: {
+    getPlayerOrigin: () => ipcRenderer.invoke("spot-cloud:youtube-player-origin")
+  },
   localMusic: {
     listFolders: () => ipcRenderer.invoke("spot-cloud:local-music-list-folders"),
     addFolder: () => ipcRenderer.invoke("spot-cloud:local-music-add-folder"),

@@ -9,7 +9,6 @@ import type {
 } from "@amp/core";
 import type { Provider, UnifiedTrack } from "@amp/core";
 import { clampVolume } from "@amp/core";
-import { gatewayRequest } from "../desktopBridge";
 
 /*
  * A minimal, shared HTML5 <audio> playback adapter — the whole implementation for providers whose
@@ -223,26 +222,6 @@ export class HtmlAudioAdapter implements PlaybackAdapter {
       listener(event);
     }
   }
-}
-
-/** YouTube: audio is proxied by the main process at amp-stream://youtube/<videoId>. */
-export function createYouTubeAdapter(initialVolume?: number): HtmlAudioAdapter {
-  return new HtmlAudioAdapter({
-    provider: "youtube",
-    initialVolume,
-    resolveSrc: (track) => `amp-stream://youtube/${encodeURIComponent(track.providerTrackId || track.id)}`,
-    search: async (query) => {
-      const result = await gatewayRequest<UnifiedTrack[]>({
-        provider: "youtube",
-        operation: "search",
-        variables: { query }
-      });
-      if (!result.ok || !result.data) {
-        throw new Error(result.error ?? "YouTube search failed.");
-      }
-      return result.data;
-    }
-  });
 }
 
 /** Local files: served off disk at amp-local://audio/<id>. Search is done over the scanned

@@ -145,6 +145,9 @@ interface SpotCloudBridge {
   spotify: {
     getAnonymousSession(): Promise<{ accessToken: string; clientToken: string } | undefined>;
   };
+  youtube: {
+    getPlayerOrigin(): Promise<string | undefined>;
+  };
   localMusic: {
     listFolders(): Promise<string[]>;
     addFolder(): Promise<string[]>;
