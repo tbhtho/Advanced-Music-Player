@@ -1,4 +1,5 @@
 import { register } from "node:module";
+import { readFile } from "node:fs/promises";
 
 register("./_tsresolve.mjs", import.meta.url);
 
@@ -40,6 +41,12 @@ const track = (provider, artist, title, extra = {}) => {
     ...extra
   };
 };
+
+// Spotify's SDK script creates a cross-origin embedded player frame. Loading the script while
+// omitting its frame origin from CSP leaves connect() pending until AMP's ready timeout fires.
+const indexHtml = await readFile(new URL("../index.html", import.meta.url), "utf8");
+const frameSources = indexHtml.match(/frame-src\s+([^;]+)/)?.[1] ?? "";
+assert(frameSources.includes("https://sdk.scdn.co"), "CSP permits Spotify's embedded player frame");
 
 // ---- detectScript ----
 assert(detectScript("Blinding Lights The Weeknd") === "latin", "latin detected");

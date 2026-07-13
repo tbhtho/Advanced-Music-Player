@@ -139,7 +139,10 @@ export function ensureSpotifyWebDevice(getToken: TokenProvider): Promise<string>
           // Called on init and again whenever the SDK needs a fresh token; getToken
           // already refreshes, so this keeps the device authenticated indefinitely.
           void getToken().then((token) => {
-            if (token && !settled && generation === deviceGeneration) {
+            // Spotify calls this again after the device is ready whenever its access token
+            // expires. `settled` only tracks the initial ready promise; it must not suppress
+            // later refresh callbacks or an established player silently loses authentication.
+            if (token && generation === deviceGeneration) {
               cb(token);
             }
           });
