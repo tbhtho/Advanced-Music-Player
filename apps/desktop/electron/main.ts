@@ -41,6 +41,7 @@ import { listFirefoxProfiles, readFirefoxCookies } from "./firefoxCookies.js";
 import { readSafariCookies, FullDiskAccessError } from "./safariCookies.js";
 import { clearSoundCloudResolverSession } from "./SoundCloudResolverWindow.js";
 import { applyWindowMaterial, selectWindowMaterial, type WindowMaterial } from "./windowMaterial.js";
+import { createStoredProviderRuntimeStatus, requireSpotifyClientId, type ProviderRuntimeOAuthStatus } from "./providerOAuthStatus.js";
 
 let windowMaterial: WindowMaterial = "opaque";
 
@@ -114,13 +115,6 @@ interface DesktopConfig {
   soundCloudClientId: string;
   soundCloudClientSecret: string;
   soundCloudClientSecretConfigured: boolean;
-}
-
-interface ProviderRuntimeOAuthStatus {
-  configured: boolean;
-  hasStoredSession: boolean;
-  storageMode: ProviderStorageMode;
-  message: string;
 }
 
 interface RuntimeInfo {
@@ -2795,62 +2789,6 @@ function getDesktopWindowState(): DesktopWindowState {
   };
 }
 
-function createStoredProviderRuntimeStatus(
-  provider: Provider,
-  config: DesktopConfig,
-  storedSession?: StoredProviderSessionRecord,
-  hasVolatileSession = false
-): ProviderRuntimeOAuthStatus {
-  const hasSoundCloudDesktopOAuth = Boolean(config.soundCloudClientId && config.soundCloudClientSecret);
-  const hasPersistedSession = Boolean(storedSession?.encryptedRefreshToken || storedSession?.encryptedAccessToken);
-  const configured =
-    (provider === "spotify" ? Boolean(config.spotifyClientId) : hasSoundCloudDesktopOAuth) ||
-    hasPersistedSession ||
-    hasVolatileSession;
-
-  if (!configured) {
-    return {
-      configured: false,
-      hasStoredSession: false,
-      storageMode: "none",
-      message:
-        provider === "spotify"
-          ? "Spotify sign-in needs SPOTIFY_CLIENT_ID in this build."
-          : "SoundCloud API sign-in needs a client ID and secret configured in Settings. Public SoundCloud search and playback still work without it."
-    };
-  }
-
-  if (hasPersistedSession && storedSession) {
-    return {
-      configured: true,
-      hasStoredSession: true,
-      storageMode: storedSession.storageMode,
-      message: "Ready to reconnect on this device."
-    };
-  }
-
-  if (hasVolatileSession) {
-    return {
-      configured: true,
-      hasStoredSession: false,
-      storageMode: "memory-only",
-      message: "Connected for this app session only."
-    };
-  }
-
-  return {
-    configured: true,
-    hasStoredSession: false,
-    storageMode: "none",
-    message:
-      provider === "soundcloud"
-        ? hasSoundCloudDesktopOAuth
-          ? "Ready to connect inside AMP and sync your SoundCloud likes plus playlists."
-          : "SoundCloud library sign-in needs bundled desktop OAuth credentials in this standalone build. Public SoundCloud tracks can still search and play without them."
-        : "Ready to connect and sync your library."
-  };
-}
-
 async function buildRuntimeInfo(): Promise<RuntimeInfo> {
   const config = await readResolvedDesktopConfig();
   const sessions = await readProviderSessionsFile();
@@ -3167,10 +3105,7 @@ async function refreshProviderSession(provider: Provider): Promise<ProviderOAuth
 
 async function connectSpotify(): Promise<ProviderOAuthResult> {
   const config = await readResolvedDesktopConfig();
-  const clientId = config.spotifyClientId || process.env.SPOTIFY_CLIENT_ID;
-  if (!clientId) {
-    throw new Error("Spotify sign-in needs SPOTIFY_CLIENT_ID in this standalone build.");
-  }
+  const clientId = requireSpotifyClientId(config.spotifyClientId);
   const expectedEpoch = getProviderSessionEpoch("spotify") + 1;
   providerSessionEpoch.set("spotify", expectedEpoch);
 

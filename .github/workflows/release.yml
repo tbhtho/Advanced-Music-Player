@@ -25,9 +25,8 @@ jobs:
     name: Windows installer
     runs-on: windows-latest
     env:
-      # OAuth / Discord IDs baked into the installer. All optional: an empty secret resolves
-      # to "" and writeBundledConfig.mjs simply skips it, so the build still succeeds and
-      # users can configure their own credentials in-app.
+      # Spotify's public app identifier is required for distributable installers.
+      # SoundCloud and Discord identifiers remain optional. No Spotify client secret is used.
       SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
       SOUNDCLOUD_CLIENT_ID: ${{ secrets.SOUNDCLOUD_CLIENT_ID }}
       DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}

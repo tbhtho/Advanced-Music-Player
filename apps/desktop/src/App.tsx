@@ -152,13 +152,13 @@ function getProviderConfigStatus(runtime: RuntimeInfo | undefined, provider: OAu
   const providerStatus = runtime.oauth[provider];
   return {
     ready: providerStatus.configured,
-    value: providerStatus.hasStoredSession
+    value: !providerStatus.configured
+      ? provider === "spotify"
+        ? "Spotify sign-in unavailable in this build"
+        : "SOUNDCLOUD_CLIENT_ID or SOUNDCLOUD_CLIENT_SECRET missing"
+      : providerStatus.hasStoredSession
       ? `${providerStatus.storageMode} session available`
-      : providerStatus.configured
-        ? `${providerStatus.storageMode === "memory-only" ? "session is memory-only" : "no stored session yet"}`
-        : provider === "spotify"
-          ? "SPOTIFY_CLIENT_ID missing"
-          : "SOUNDCLOUD_CLIENT_ID or SOUNDCLOUD_CLIENT_SECRET missing",
+      : `${providerStatus.storageMode === "memory-only" ? "session is memory-only" : "no stored session yet"}`,
     message: providerStatus.message
   };
 }

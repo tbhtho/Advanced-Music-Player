@@ -12,9 +12,13 @@ Tagged releases require these repository secrets:
 | `EVS_ACCOUNT_NAME` | castLabs EVS account used for VMP signing. |
 | `EVS_PASSWD` | castLabs EVS password used for non-interactive authentication. |
 
-These client IDs are optional. If omitted, users can configure their own in the app:
+Distributable installers also require AMP's existing public `SPOTIFY_CLIENT_ID`, supplied in the
+build environment or a local `.env` file. `dist` stops before packaging if it is missing, so an
+installer cannot silently ship with a broken Spotify sign-in button. Spotify uses PKCE and does
+not need a client secret. Normal source builds and offline tests can omit the identifier.
 
-- `SPOTIFY_CLIENT_ID`
+These client IDs remain optional:
+
 - `SOUNDCLOUD_CLIENT_ID`
 - `DISCORD_CLIENT_ID`
 

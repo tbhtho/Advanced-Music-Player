@@ -12,7 +12,7 @@
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "preview": "vite preview",
     "smoke": "pnpm exec electron .",
-    "dist": "npm run build && node scripts/runElectronBuilder.mjs",
+    "dist": "npm run build && node scripts/writeBundledConfig.mjs --require-spotify && node scripts/runElectronBuilder.mjs",
     "evs:signup": "python -m castlabs_evs.account signup",
     "evs:reauth": "python -m castlabs_evs.account reauth",
     "verify:vmp": "node scripts/verify-vmp.mjs"
