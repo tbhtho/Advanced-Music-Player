@@ -12,9 +12,9 @@ Spotify, SoundCloud, YouTube, and your local music in one library, with mixed pl
 
 ## Get AMP
 
-**Windows:** [Release downloads](https://github.com/tbhtho/Advanced-Music-Player/releases).
+**Windows:** [Download AMP 0.3.5](https://github.com/tbhtho/Advanced-Music-Player/releases/download/v0.3.5/AMP.Setup.0.3.5.exe) · [Release notes and checksums](https://github.com/tbhtho/Advanced-Music-Player/releases/tag/v0.3.5).
 
-No installer has been published in this repository yet. To run the current source, follow the [development setup](docs/DEVELOPMENT.md). Release installers use the name `AMP Setup x.y.z.exe`.
+The installer uses production castLabs VMP signing. Windows publisher signing is not configured, so SmartScreen may show a warning. To run the current source, follow the [development setup](docs/DEVELOPMENT.md).
 
 ## Quick start
 
