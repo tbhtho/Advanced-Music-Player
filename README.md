@@ -16,6 +16,20 @@ Spotify, SoundCloud, YouTube, and your local music in one library, with mixed pl
 
 The installer uses production castLabs VMP signing. Windows publisher signing is not configured, so SmartScreen may show a warning. To run the current source, follow the [development setup](docs/DEVELOPMENT.md).
 
+<p align="center">
+  <a href="docs/screenshots/playlists-0.3.5.png"><img src="docs/screenshots/playlists-0.3.5.png" width="960" alt="AMP 0.3.5 playlist editor with compact controls and sample Spotify and SoundCloud tracks"></a><br>
+  <sub>Mixed-provider playlists with compact controls.</sub>
+</p>
+
+<table>
+  <tr>
+    <td width="50%"><a href="docs/screenshots/home-0.3.5.png"><img src="docs/screenshots/home-0.3.5.png" width="100%" alt="AMP 0.3.5 Home showing daily mixes and song stations with sample tracks"></a><br><sub>Daily mixes and song stations.</sub></td>
+    <td width="50%"><a href="docs/screenshots/settings-0.3.5.png"><img src="docs/screenshots/settings-0.3.5.png" width="100%" alt="AMP 0.3.5 Settings showing sample provider connections, appearance options and local music folders"></a><br><sub>Provider connections, appearance and local music.</sub></td>
+  </tr>
+</table>
+
+Screenshots show the released 0.3.5 interface with sample tracks, playlists and account states. Select an image to view it at full size. [Capture details](docs/screenshots/README.md).
+
 ## Quick start
 
 1. Launch AMP and open **Settings** to connect the providers you want to use.
