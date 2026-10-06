@@ -5,22 +5,25 @@
 :root {
   /* Surfaces — layered from the window shell up to raised cards. A little more separation between
      the steps than before gives the near-black UI real depth instead of reading as one flat slab. */
-  --shell: #101012;
-  --panel-strong: #1b1b1e;
+  --shell: #171719;
+  --panel-strong: #19191c;
   --panel: #202023;
   --panel-soft: #29292d;
-  --panel-tint: #18181b;
+  --panel-tint: #19191c;
+  --sidebar-surface: #1c1c1f;
+  --content-surface: #111113;
+  --section-surface: #19191c;
   --card-tint: var(--panel);
   --bar-tint: var(--panel-strong);
-  --paper: #f4f4f5;
-  --ink: #f4f4f5;
-  --muted: #b0b0b6;
-  --faint: #a0a0a8;
+  --paper: #e7e7ec;
+  --ink: #e7e7ec;
+  --muted: #acacb5;
+  --faint: #9c9ca7;
   --edge: rgba(255, 255, 255, 0.075);
   --edge-strong: rgba(255, 255, 255, 0.13);
   --hairline: rgba(255, 255, 255, 0.055);
   /* Idle accent is monotone; the current song's artwork overrides --acid at runtime. */
-  --acid: #e8e8ec;
+  --acid: #dedee4;
   /* Raw "r, g, b" of the current song's colour, for rgba() gradients. */
   --song-rgb: 232, 232, 236;
   --spotify: #a8a6a0;
@@ -40,9 +43,9 @@
   /* Corner radii — one consistent scale so cards, pills and inputs feel like one family.
      Deliberately tight: sharp corners read pro-audio, not bubbly. */
   --radius-sm: 6px;
-  --radius: 9px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
+  --radius: 7px;
+  --radius-lg: 10px;
+  --radius-xl: 13px;
 
   /* Elevation — soft, diffused shadows tuned for near-black surfaces (hard shadows disappear here;
      these lean on a wide, low-opacity spread). --shadow-glow picks up the current song's colour. */
@@ -86,9 +89,12 @@
 /* One native window backdrop, with neutral tint and the user's own desktop behind it. */
 html[data-material="glass"] {
   --shell: rgba(10, 10, 12, 0.82);
-  --panel-tint: rgba(18, 18, 21, 0.42);
-  --card-tint: rgba(34, 34, 38, 0.62);
-  --bar-tint: rgba(25, 25, 29, 0.78);
+  --panel-tint: rgba(24, 24, 27, 0.38);
+  --sidebar-surface: rgba(33, 33, 37, 0.52);
+  --content-surface: rgba(12, 12, 15, 0.60);
+  --section-surface: rgba(30, 30, 34, 0.52);
+  --card-tint: rgba(34, 34, 38, 0.54);
+  --bar-tint: rgba(25, 25, 29, 0.68);
 }
 
 html,
@@ -231,9 +237,7 @@ button:disabled,
 /* A raised card: faint top light + hairline edge + soft elevation. The top-light gradient is what
    sells "lit from above" on dark surfaces and makes panels feel physical rather than painted on. */
 .surface {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0) 38%),
-    var(--card-tint);
+  background: var(--card-tint);
   border: 1px solid var(--edge);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-md);
@@ -252,16 +256,12 @@ button:disabled,
   box-shadow: var(--shadow-lg);
 }
 
-/* Native material is applied once to the window; panels add only tint and a faint top highlight. */
+/* Native material is applied once to the window. Chrome uses flat neutral tints. */
 .glass-panel {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0) 30%),
-    var(--panel-tint);
+  background: var(--panel-tint);
 }
 .glass-bar {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.022), rgba(255, 255, 255, 0) 26%),
-    var(--bar-tint);
+  background: var(--bar-tint);
 }
 .glass-popover {
   background: var(--panel-strong);
@@ -273,6 +273,135 @@ button:disabled,
   background: var(--panel-strong);
   border: 1px solid var(--edge);
   box-shadow: var(--shadow-lg);
+}
+
+/* Desktop chrome: one quiet sidebar and one inset content canvas. */
+.amp-sidebar {
+  padding: 20px 10px 14px;
+  background: var(--sidebar-surface);
+}
+.amp-sidebar-heading {
+  margin: 0 10px 12px;
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 500;
+}
+.amp-navigation { display: flex; flex-direction: column; gap: 3px; }
+.amp-navigation-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+.amp-navigation-item:nth-child(5) { margin-top: 16px; }
+.amp-navigation-item:hover { color: var(--paper); background: rgba(255,255,255,0.045); }
+.amp-navigation-active { color: var(--paper); background: rgba(255,255,255,0.085); }
+.amp-main {
+  margin: 8px 10px 10px 0;
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  background: var(--content-surface);
+  overflow: hidden;
+}
+.amp-page-scroll { padding: 22px 24px 24px; }
+.amp-page-title {
+  margin: 0;
+  color: var(--paper);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.035em;
+}
+.amp-section {
+  padding: 16px;
+  border: 1px solid var(--hairline);
+  border-radius: 9px;
+  background: var(--section-surface);
+}
+.amp-section-heading { margin-bottom: 12px; }
+.amp-home > .amp-section { padding: 0; border: 0; border-radius: 0; background: transparent; }
+.amp-home .amp-section-heading { margin-bottom: 8px; }
+.amp-home .amp-section > p { font-size: 12px; line-height: 1.6; }
+.amp-track-card { background: transparent; }
+
+/* Compact controls preserve visible focus and a minimum 28px pointer target. */
+.amp-button {
+  min-height: 28px;
+  padding: 4px 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+.amp-button-primary { color: var(--shell); background: var(--acid); }
+.amp-button-primary:hover:not(:disabled) { filter: brightness(0.94); }
+.amp-button-secondary { color: var(--paper); border-color: var(--edge); background: rgba(255,255,255,0.035); }
+.amp-button-secondary:hover:not(:disabled) { background: rgba(255,255,255,0.075); border-color: var(--edge-strong); }
+.amp-button-ghost { color: var(--muted); background: transparent; }
+.amp-button-ghost:hover:not(:disabled) { color: var(--paper); background: rgba(255,255,255,0.045); }
+.amp-icon-button {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  color: var(--muted);
+  background: transparent;
+}
+.amp-icon-button:hover:not(:disabled) { color: var(--paper); background: rgba(255,255,255,0.075); }
+.amp-icon-primary { color: var(--shell); background: var(--acid); }
+.amp-icon-primary:hover:not(:disabled) { color: var(--shell); background: var(--acid); }
+.amp-text-field,
+.amp-page input[aria-label="Search your library"] {
+  height: 32px;
+  padding: 6px 10px;
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  color: var(--paper);
+  background: rgba(255,255,255,0.035);
+  font-size: 12px;
+  outline: none;
+}
+.amp-track-row { min-height: 50px; padding: 7px 5px; border: 0; border-bottom: 1px solid var(--hairline); border-radius: 4px; }
+.amp-track-row:hover { background-color: rgba(255,255,255,0.035); }
+.amp-provider-dot { width: 5px; height: 5px; flex: none; border-radius: 50%; }
+
+/* Preferences read as grouped rows, with compact actions and quiet typography. */
+.amp-settings .text-sm { font-size: 12px; line-height: 1.65; }
+.amp-settings .text-xl { font-size: 14px; line-height: 1.45; }
+.amp-settings .text-2xl { font-size: 16px; line-height: 1.4; }
+.amp-settings > .space-y-6 > :not([hidden]) ~ :not([hidden]) { margin-top: 16px; }
+.amp-setting-row { padding: 14px 0; margin-top: 14px; border-top: 1px solid var(--hairline); }
+.amp-setting-row + .amp-setting-row { margin-top: 0; }
+.amp-setting-row .mt-2, .amp-setting-row .mt-3 { margin-top: 5px; }
+.amp-settings .amp-section > .mt-8 { margin-top: 14px; }
+.amp-settings .amp-section > .mt-8 > div { padding: 12px; border-radius: 7px; }
+.amp-appearance-options { display: grid; grid-template-columns: 1fr; gap: 0; margin-top: 14px; border: 1px solid var(--edge); border-radius: 7px; overflow: hidden; }
+.amp-appearance-option { display: grid; grid-template-columns: 14px 1fr; gap: 3px 10px; width: 100%; min-height: 52px; padding: 10px 12px; border: 0; border-bottom: 1px solid var(--hairline); border-radius: 0; text-align: left; background: transparent; }
+.amp-appearance-option:last-child { border-bottom: 0; }
+.amp-appearance-option::before { content: ""; grid-column: 1; grid-row: 1 / 3; align-self: center; width: 11px; height: 11px; border: 1px solid var(--faint); border-radius: 50%; }
+.amp-appearance-option[aria-pressed="true"] { background: rgba(255,255,255,0.045); }
+.amp-appearance-option[aria-pressed="true"]::before { border-color: var(--paper); background: var(--paper); box-shadow: inset 0 0 0 2px var(--panel); }
+.amp-appearance-option p { grid-column: 2; margin: 0; }
+.amp-appearance-option p:first-of-type { font-size: 12px; font-weight: 500; line-height: 17px; }
+.amp-appearance-option p:last-of-type { font-size: 11px; line-height: 16px; }
+
+@media (max-width: 900px) { .amp-page-scroll { padding: 18px; } }
+@media (forced-colors: active) {
+  .amp-main, .amp-section, .amp-text-field { border-color: CanvasText; }
+  .amp-navigation-active, .amp-appearance-option[aria-pressed="true"] { outline: 1px solid Highlight; }
+  .amp-icon-button { color: ButtonText; }
 }
 
 input[type="range"] {

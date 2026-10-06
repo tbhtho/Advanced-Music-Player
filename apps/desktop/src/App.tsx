@@ -597,7 +597,7 @@ export function App() {
           className="pointer-events-none fixed inset-0 -z-10 transition-[background] duration-700"
           style={{
             background:
-              "radial-gradient(150% 105% at 0% -12%, rgba(var(--song-rgb), 0.12), rgba(var(--song-rgb), 0.035) 46%, transparent 78%)"
+              "transparent"
           }}
         />
         <div
@@ -621,7 +621,7 @@ export function App() {
         <div
           className={cn(
             "grid min-h-0 flex-1",
-            showQueue ? "grid-cols-[240px_1fr_320px]" : "grid-cols-[240px_1fr]"
+            showQueue ? "grid-cols-[196px_minmax(0,1fr)_300px]" : "grid-cols-[196px_minmax(0,1fr)]"
           )}
         >
           <motion.aside
@@ -629,7 +629,7 @@ export function App() {
             initial="initial"
             animate="animate"
             transition={spring.panel}
-            className="vibrancy glass-panel overflow-hidden border-r border-[var(--edge)] px-5 py-5"
+            className="amp-sidebar vibrancy glass-panel overflow-hidden"
           >
             <Sidebar />
           </motion.aside>
@@ -637,10 +637,10 @@ export function App() {
             initial={panelVariants.rise.initial}
             animate={panelVariants.rise.animate}
             transition={{ ...spring.panel, delay: 0.04 }}
-            className="flex min-h-0 flex-col"
+            className="amp-main flex min-h-0 min-w-0 flex-col"
           >
             <NoticeBanner />
-            <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6 pt-4">
+            <div className="amp-page-scroll min-h-0 flex-1 overflow-y-auto">
               {/* No AnimatePresence/mode="wait" here: waiting for the outgoing page's exit to finish
                   before mounting the next one added ~200ms of dead air to every tab switch. Each
                   PageFrame fades itself in on mount (keyed by title), so the new page appears at once
@@ -1042,22 +1042,23 @@ function Onboarding({ showCustomChrome }: { showCustomChrome: boolean }) {
 function Sidebar() {
   return (
     <div className="flex h-full flex-col justify-between">
-      <div className="space-y-6">
-        <nav className="space-y-2">
+      <div>
+        <p className="amp-sidebar-heading">Music</p>
+        <nav className="amp-navigation" aria-label="Main navigation">
           {navItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               className={({ isActive }) =>
                 cn(
-                  "flex items-center gap-3 rounded-[var(--radius)] px-3.5 py-2.5 font-display text-[15px] font-medium tracking-[-0.01em] transition",
+                  "amp-navigation-item",
                   isActive
-                    ? "bg-gradient-to-r from-[rgba(var(--song-rgb),0.2)] via-[rgba(var(--song-rgb),0.07)] to-transparent text-[var(--paper)] shadow-[0_0_22px_-8px_rgba(var(--song-rgb),0.55)]"
-                    : "text-[var(--muted)] opacity-65 hover:bg-white/[0.04] hover:opacity-100 hover:text-[var(--paper)]"
+                    ? "amp-navigation-active"
+                    : "text-[var(--muted)]"
                 )
               }
             >
-              <item.icon className="h-[17px] w-[17px] shrink-0" strokeWidth={1.8} />
+              <item.icon className="h-4 w-4 shrink-0" strokeWidth={1.65} />
               {item.label}
             </NavLink>
           ))}
@@ -1935,9 +1936,9 @@ function PageFrame({ title, children, fill }: { title: string; children: ReactNo
       transition={tween.quick}
       // `fill` pages own their scrolling (e.g. Library's virtualized list): the frame pins itself
       // to the route container's exact height so the outer page scrollbar never engages.
-      className={fill ? "flex h-full min-h-0 flex-col gap-4" : "space-y-4"}
+      className={fill ? "amp-page flex h-full min-h-0 flex-col gap-4" : "amp-page space-y-5"}
     >
-      <h2 className="shrink-0 font-display text-xl text-[var(--paper)]">{title}</h2>
+      <h2 className="amp-page-title shrink-0">{title}</h2>
       {children}
     </motion.section>
   );
@@ -1946,9 +1947,7 @@ function PageFrame({ title, children, fill }: { title: string; children: ReactNo
 function SectionCard({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <section
-      // Borderless solid panel — surface contrast alone separates it from the page, which keeps the
-      // gray count down and the look calm (the border-on-everything pass read as "rough").
-      className={cn("rounded-[var(--radius-lg)] bg-[var(--panel-strong)] p-4", className)}
+      className={cn("amp-section", className)}
     >
       {children}
     </section>
@@ -1966,8 +1965,8 @@ function SectionHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="mb-3 flex items-baseline justify-between gap-3">
-      <h2 className="font-display text-[17px] font-semibold tracking-[-0.01em] text-[var(--paper)]">
+    <div className="amp-section-heading flex items-baseline justify-between gap-3">
+      <h2 className="text-[14px] font-semibold tracking-[-0.01em] text-[var(--paper)]">
         {title}
         {typeof count === "number" && (
           <span className="tnum ml-2 text-[13px] font-medium text-[var(--faint)]">{count}</span>
@@ -1980,8 +1979,7 @@ function SectionHeader({
 
 type BtnKind = "primary" | "secondary" | "ghost";
 
-/** Button hierarchy: pill is the signature of the ONE primary action per context; everything else
- *  is quiet. Replaces the hand-rolled rounded-full recipes. */
+/** Compact desktop controls share one size and retain their existing action semantics. */
 function Btn({
   kind = "secondary",
   className,
@@ -1991,13 +1989,13 @@ function Btn({
     <button
       type="button"
       className={cn(
-        "inline-flex items-center justify-center gap-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50",
+        "amp-button inline-flex items-center justify-center gap-1.5 font-medium transition disabled:cursor-not-allowed disabled:opacity-50",
         kind === "primary" &&
-          "rounded-full bg-[var(--acid)] px-5 py-2 text-[var(--shell)] hover:opacity-90",
+          "amp-button-primary",
         kind === "secondary" &&
-          "rounded-[var(--radius)] border border-[var(--edge)] bg-[var(--panel)] px-4 py-2 text-[var(--paper)] hover:border-[var(--edge-strong)]",
+          "amp-button-secondary",
         kind === "ghost" &&
-          "rounded-[var(--radius)] px-3 py-1.5 text-[var(--muted)] hover:bg-white/5 hover:text-[var(--paper)]",
+          "amp-button-ghost",
         className
       )}
       {...props}
@@ -2185,7 +2183,7 @@ function Switch({
 function ProviderTag({ provider }: { provider: Provider }) {
   return (
     <span
-      className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]"
+      className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium tracking-normal"
       style={{
         backgroundColor: `color-mix(in srgb, var(--${provider}) 15%, transparent)`,
         color: `var(--${provider})`
@@ -2250,7 +2248,7 @@ function TrackGrid({
               event.preventDefault();
               openTrackMenu(track, event.clientX, event.clientY);
             }}
-            className="rounded-[var(--radius)] border border-[var(--edge)] bg-[var(--panel)] p-2.5 transition hover:-translate-y-0.5 hover:border-[var(--acid)]/40"
+            className="amp-track-card rounded-[var(--radius)] p-2 transition-colors hover:bg-white/[0.035]"
           >
             <ArtworkImage
               track={track}
@@ -2269,7 +2267,7 @@ function TrackGrid({
                   type="button"
                   title="Play"
                   onClick={() => onPlay(track)}
-                  className="grid h-7 w-7 place-items-center rounded-full bg-[var(--acid)] text-[var(--shell)]"
+                  className="amp-icon-button amp-icon-primary"
                 >
                   <Play className="h-3.5 w-3.5" />
                 </button>
@@ -2278,7 +2276,8 @@ function TrackGrid({
                   title="Add to playlist"
                   onClick={() => onAdd(track)}
                   disabled={addDisabled}
-                  className="grid h-7 w-7 place-items-center rounded-full border border-[var(--edge)] text-[var(--muted)] transition hover:border-[var(--acid)]/50 hover:text-[var(--paper)] disabled:cursor-not-allowed disabled:opacity-40"
+                  aria-label="Add to playlist"
+                  className="amp-icon-button disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <Plus className="h-3.5 w-3.5" />
                 </button>
@@ -2292,7 +2291,7 @@ function TrackGrid({
                     }
                     onClick={toggleLike}
                     className={cn(
-                      "grid h-7 w-7 place-items-center rounded-full border border-[var(--edge)] text-[var(--muted)] transition",
+                      "amp-icon-button",
                       likeProvider === "spotify"
                         ? "hover:border-[var(--spotify)]/60 hover:text-[var(--spotify)]"
                         : "hover:border-[var(--soundcloud)]/60 hover:text-[var(--soundcloud)]",
@@ -2310,7 +2309,7 @@ function TrackGrid({
                     type="button"
                     title="Open source"
                     onClick={() => void openExternal(track.externalUrl!)}
-                    className="grid h-7 w-7 place-items-center rounded-full border border-[var(--edge)] text-[var(--muted)]"
+                    className="amp-icon-button"
                   >
                     <ExternalLink className="h-3.5 w-3.5" />
                   </button>
@@ -2377,9 +2376,7 @@ function TrackListRowBase({
 
   const openTrackMenu = useAppStore((state) => state.openTrackMenu);
 
-  // Provider tint — the mixed Library list leans each row toward its provider colour (Spotify
-  // green, SoundCloud orange, YouTube red, Local blue) so you can tell them apart at a glance.
-  // Selected/active rows keep the neutral --acid accent.
+  // Provider colour is confined to a small marker; row surfaces and titles stay neutral.
   const tintVar = `--${track.provider}-tint`;
   const isNeutralRow = Boolean(selected) || Boolean(isActive);
 
@@ -2390,16 +2387,16 @@ function TrackListRowBase({
         openTrackMenu(track, event.clientX, event.clientY);
       }}
       className={cn(
-        "flex w-full items-center gap-2 rounded-[var(--radius)] border p-2 transition",
+        "amp-track-row flex w-full items-center gap-2 transition-colors",
         selected
           ? "border-[var(--acid)] bg-[var(--acid)]/15"
           : isActive
             ? "border-[var(--acid)] bg-[var(--acid)]/10"
-            : "bg-[var(--panel)]",
+            : "bg-transparent",
         !track.playable && "opacity-45"
       )}
       style={
-        isNeutralRow ? undefined : { borderColor: `color-mix(in srgb, var(${tintVar}) 30%, transparent)` }
+        isNeutralRow ? undefined : { borderColor: "var(--hairline)" }
       }
     >
       {selecting ? (
@@ -2425,13 +2422,13 @@ function TrackListRowBase({
         <ArtworkImage
           track={track}
           alt={`${displayTitle(track.title)} artwork`}
-          className="h-10 w-10 rounded-[var(--radius-sm)] object-cover"
+          className="h-9 w-9 rounded-[var(--radius-sm)] object-cover"
         />
         <div className="min-w-0 flex-1">
           <p
             className="truncate font-display text-sm"
             style={{
-              color: isActive ? "var(--acid)" : `color-mix(in srgb, var(${tintVar}) 50%, var(--paper))`
+              color: isActive ? "var(--acid)" : "var(--paper)"
             }}
           >
             {displayTitle(track.title)}
@@ -2443,6 +2440,7 @@ function TrackListRowBase({
             Go+
           </span>
         ) : null}
+        <span className="amp-provider-dot" title={providerLabel(track.provider)} aria-label={providerLabel(track.provider)} style={{ backgroundColor: `var(${tintVar})` }} />
         <span className="shrink-0 text-xs text-[var(--faint)]">{formatDuration(track.durationMs)}</span>
       </button>
       {onAdd ? (
@@ -2451,7 +2449,8 @@ function TrackListRowBase({
           title="Add to playlist"
           onClick={onAdd}
           disabled={addDisabled}
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-sm)] border border-[var(--edge)] text-[var(--muted)] transition hover:border-[var(--acid)]/50 hover:text-[var(--paper)] disabled:cursor-not-allowed disabled:opacity-40"
+          aria-label="Add to playlist"
+          className="amp-icon-button shrink-0 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <Plus className="h-4 w-4" />
         </button>
@@ -2462,7 +2461,7 @@ function TrackListRowBase({
           title={isLiked ? "Remove from likes" : "Add to likes"}
           onClick={toggleLike}
           className={cn(
-            "grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-sm)] border border-[var(--edge)] text-[var(--muted)] transition hover:border-[var(--acid)]/60 hover:text-[var(--acid)]",
+            "amp-icon-button shrink-0 hover:text-[var(--acid)]",
             isLiked && "border-[var(--acid)]/50 text-[var(--acid)]"
           )}
         >
@@ -2747,7 +2746,7 @@ function HomePage() {
   }, [projectTracks, generateDailyMixes]);
 
   return (
-    <div className="space-y-4">
+    <div className="amp-home space-y-7">
       {dailyMixes.length > 0 || mixesStatus === "loading" || (mixesStatus === "ready" && projectTracks.length >= 4) ? (
         <SectionCard>
           <SectionHeader
@@ -4128,7 +4127,7 @@ function PlaylistsPage() {
   }, [activePlaylist?.id, activePlaylist?.title]);
 
   return (
-    <div className="space-y-6">
+    <div className="amp-playlists space-y-5">
       <div className="flex flex-wrap gap-2">
         {PLAYLIST_TABS.map((entry) => (
           <button
@@ -4147,7 +4146,7 @@ function PlaylistsPage() {
         ))}
       </div>
       {tab === "mine" ? (
-      <div className="grid gap-6 xl:grid-cols-[340px_1fr]">
+      <div className="grid gap-4 xl:grid-cols-[272px_1fr]">
       <SectionCard>
         <SectionHeader title="Your playlists" />
 
@@ -4166,10 +4165,11 @@ function PlaylistsPage() {
             value={draftTitle}
             onChange={(event) => setDraftTitle(event.target.value)}
             placeholder="New playlist title"
-            className="w-full rounded-[var(--radius-lg)] border border-[var(--edge)] bg-[var(--panel)] px-4 py-3 text-sm text-[var(--paper)] outline-none"
+            aria-label="New playlist title"
+            className="amp-text-field min-w-0 flex-1"
           />
-          <Btn kind="primary" type="submit">
-            <Plus className="h-4 w-4" />
+          <Btn kind="secondary" className="amp-icon-button" type="submit" aria-label="Create playlist" title="Create playlist">
+            <Plus className="h-3.5 w-3.5" />
           </Btn>
         </form>
 
@@ -4180,7 +4180,7 @@ function PlaylistsPage() {
               type="button"
               onClick={() => selectPlaylist(playlist.id)}
               className={cn(
-                "w-full rounded-[var(--radius-lg)] p-4 text-left transition",
+                "w-full rounded-[var(--radius-sm)] px-3 py-2.5 text-left transition-colors",
                 selectedPlaylistId === playlist.id
                   ? "bg-[var(--paper)]/8"
                   : "hover:bg-white/[0.04]"
@@ -4239,7 +4239,7 @@ function PlaylistsPage() {
             >
               {activePlaylist.entries.map((entry) => (
                 <Reorder.Item key={entry.id} value={entry} className="list-none">
-                  <div className="flex w-full items-center gap-3 rounded-[var(--radius)] border border-[var(--edge)] bg-[var(--panel)] p-4">
+                  <div className="amp-track-row flex w-full items-center gap-2">
                     <button
                       type="button"
                       onClick={() =>
@@ -4248,18 +4248,18 @@ function PlaylistsPage() {
                           label: activePlaylist.title
                         })
                       }
-                      className="flex min-w-0 flex-1 items-center gap-4 text-left"
+                      className="flex min-w-0 flex-1 items-center gap-3 text-left"
                     >
                       <ArtworkImage
                         track={entry.track}
                         alt={`${entry.track.title} artwork`}
-                        className="h-16 w-16 rounded-[var(--radius)] object-cover"
+                        className="h-9 w-9 rounded-[var(--radius-sm)] object-cover"
                       />
                       <div className="min-w-0 flex-1">
-                        <p className="truncate font-display text-xl text-[var(--paper)]">
+                        <p className="truncate text-sm font-medium text-[var(--paper)]">
                           {displayTitle(entry.track.title)}
                         </p>
-                        <p className="truncate text-sm text-[var(--muted)]">
+                        <p className="truncate text-xs text-[var(--muted)]">
                           {displayCreators(entry.track.creators)}
                         </p>
                       </div>
@@ -4295,7 +4295,7 @@ function PlaylistsPage() {
                             }
                           }}
                           className={cn(
-                            "grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius)] border border-[var(--edge)] text-[var(--muted)] transition",
+                            "amp-icon-button shrink-0",
                             likeProvider === "spotify"
                               ? "hover:border-[var(--spotify)]/60 hover:text-[var(--spotify)]"
                               : "hover:border-[var(--soundcloud)]/60 hover:text-[var(--soundcloud)]",
@@ -4313,7 +4313,7 @@ function PlaylistsPage() {
                       type="button"
                       title="Remove from playlist"
                       onClick={() => void removeTrackFromPlaylist(activePlaylist.id, entry.id)}
-                      className="grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius)] border border-[var(--edge)] text-[var(--muted)] transition hover:border-[var(--warn)]/60 hover:text-[var(--warn)]"
+                      className="amp-icon-button shrink-0 hover:text-[var(--warn)]"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -5039,7 +5039,7 @@ function AppearanceCard() {
       </p>
       <div
         className={cn(
-          "mt-5 grid gap-3",
+          "amp-appearance-options",
           visibleOptions.length === 3 ? "grid-cols-3" : "grid-cols-2"
         )}
       >
@@ -5057,7 +5057,7 @@ function AppearanceCard() {
               }
             }}
             className={cn(
-              "rounded-[var(--radius-lg)] border p-4 text-left transition",
+              "amp-appearance-option transition-colors",
               accentSource === option.id
                 ? "border-[var(--acid)] bg-[var(--paper)]/5"
                 : "border-[var(--edge)] bg-[var(--panel)] hover:border-[var(--acid)]/40"
@@ -5353,7 +5353,7 @@ function SettingsPage() {
 
   return (
     <>
-      <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+      <div className="amp-settings grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
         <div className="space-y-6">
         <SectionCard>
           <SectionHeader title="AMP" />
@@ -5362,7 +5362,7 @@ function SettingsPage() {
             account, no cloud.
           </p>
 
-          <div className="mt-6 rounded-[var(--radius-lg)] border border-[var(--edge)] bg-[var(--panel)] p-5">
+          <div className="amp-setting-row mt-6">
             <div className="flex items-start gap-3">
               <CheckCircle2 className="mt-1 h-5 w-5 text-[var(--acid)]" />
               <div>
@@ -5375,7 +5375,7 @@ function SettingsPage() {
             </div>
           </div>
 
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-4 rounded-[var(--radius-lg)] border border-[var(--edge)] bg-[var(--panel)] p-5">
+          <div className="amp-setting-row flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-start gap-3">
               <RotateCcw className="mt-1 h-5 w-5 text-[var(--acid)]" />
               <div>
