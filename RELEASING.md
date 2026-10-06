@@ -12,10 +12,15 @@ Tagged releases require these repository secrets:
 | `EVS_ACCOUNT_NAME` | castLabs EVS account used for VMP signing. |
 | `EVS_PASSWD` | castLabs EVS password used for non-interactive authentication. |
 
-Distributable installers also require AMP's existing public `SPOTIFY_CLIENT_ID`, supplied in the
-build environment or a local `.env` file. `dist` stops before packaging if it is missing, so an
-installer cannot silently ship with a broken Spotify sign-in button. Spotify uses PKCE and does
-not need a client secret. Normal source builds and offline tests can omit the identifier.
+Distributable installers require AMP's public `SPOTIFY_CLIENT_ID`. The registered AMP identifier
+is checked in at `apps/desktop/build/public-desktop-config.json` and is copied into the bundle.
+Build environment or local `.env` values override it. `dist` stops before packaging if both are
+missing, so an installer cannot silently ship with a broken Spotify sign-in button. Spotify uses
+PKCE and does not need a client secret. Offline fixtures may omit the identifier.
+
+The registered redirect is `http://127.0.0.1:8000/spotify/callback`. AMP's Spotify application is
+in development mode; users must satisfy Spotify's current account and app allowlist requirements.
+See [Spotify's quota modes](https://developer.spotify.com/documentation/web-api/concepts/quota-modes).
 
 These client IDs remain optional:
 

@@ -25,7 +25,8 @@ jobs:
     name: Windows installer
     runs-on: windows-latest
     env:
-      # Spotify's public app identifier is required for distributable installers.
+      # The registered public Spotify identifier is bundled from build/public-desktop-config.json.
+      # This environment value is an optional override for a different registered application.
       # SoundCloud and Discord identifiers remain optional. No Spotify client secret is used.
       SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
       SOUNDCLOUD_CLIENT_ID: ${{ secrets.SOUNDCLOUD_CLIENT_ID }}

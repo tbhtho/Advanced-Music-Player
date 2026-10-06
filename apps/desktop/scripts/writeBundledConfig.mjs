@@ -20,8 +20,16 @@ export async function writeBundledConfig({
   ]) {
     loadEnv({ path: envPath, override: false, processEnv: env, quiet: true });
   }
+
+  // AMP's public app identifier is safe to ship. Environment and local overrides still win.
+  let publicDefaults = {};
+  try {
+    publicDefaults = JSON.parse(await fs.readFile(path.join(desktopRoot, "build", "public-desktop-config.json"), "utf8"));
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
   const bundledConfig = Object.fromEntries(publicKeys
-    .map(key => [key, env[key]?.trim() || ""])
+    .map(key => [key, env[key]?.trim() || (typeof publicDefaults[key] === "string" ? publicDefaults[key].trim() : "")])
     .filter(([, value]) => value));
   await fs.mkdir(path.dirname(outputPath), { recursive: true });
 

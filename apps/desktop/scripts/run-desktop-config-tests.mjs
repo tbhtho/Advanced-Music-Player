@@ -69,3 +69,24 @@ test("normal source builds remain available without any OAuth identifier", async
   assert.equal((await writeBundledConfig({ ...f, env: {} })).written, false);
   await assert.rejects(readFile(f.file), { code: "ENOENT" });
 });
+
+test("release builds use public app defaults when CI overrides are empty and ignore private keys", async () => {
+  const f = await fixture();
+  await mkdir(path.join(f.desktopRoot, "build"));
+  await writeFile(path.join(f.desktopRoot, "build", "public-desktop-config.json"), JSON.stringify({
+    SPOTIFY_CLIENT_ID: "  registered-public-fixture  ",
+    SPOTIFY_CLIENT_SECRET: "offline-secret-fixture",
+    EVS_PASSWD: "offline-secret-fixture"
+  }));
+  await writeBundledConfig({ ...f, env: { SPOTIFY_CLIENT_ID: "" }, requireSpotify: true });
+  assert.deepEqual(JSON.parse(await readFile(f.file, "utf8")), { SPOTIFY_CLIENT_ID: "registered-public-fixture" });
+  await writeBundledConfig({ ...f, env: { SPOTIFY_CLIENT_ID: "override-public-fixture" }, requireSpotify: true });
+  assert.deepEqual(JSON.parse(await readFile(f.file, "utf8")), { SPOTIFY_CLIENT_ID: "override-public-fixture" });
+});
+
+test("invalid public app defaults fail the build rather than silently hiding a configuration error", async () => {
+  const f = await fixture();
+  await mkdir(path.join(f.desktopRoot, "build"));
+  await writeFile(path.join(f.desktopRoot, "build", "public-desktop-config.json"), "{broken");
+  await assert.rejects(writeBundledConfig({ ...f, env: {}, requireSpotify: true }), SyntaxError);
+});
