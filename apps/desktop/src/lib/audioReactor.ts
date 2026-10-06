@@ -65,7 +65,11 @@ export class AudioReactor {
    * getDisplayMedia call carries transient activation where Chromium demands it.
    */
   primeLoopback(): void {
-    void this.ensureLoopback();
+    if (document.hidden) return;
+    void this.ensureLoopback().then(() => {
+      // A failed play gesture must not leave desktop capture running while idle.
+      window.setTimeout(() => { if (!this.running) this.releaseLoopback(); }, 1500);
+    });
   }
 
   start(): void {
@@ -104,6 +108,7 @@ export class AudioReactor {
 
   /** Fully release the system-audio capture (leaving audio mode). Allows a fresh retry later. */
   releaseLoopback(): void {
+    this.stop();
     this.acquisitionGeneration += 1;
     const stream = this.loopbackStream;
     this.loopbackStream = null;

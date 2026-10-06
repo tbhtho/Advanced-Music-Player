@@ -14,6 +14,8 @@
 
 import { BrowserWindow, session, type Session } from "electron";
 
+import { IdleRelease } from "./idleRelease.js";
+
 const RESOLVER_PARTITION = "persist:sc-resolver";
 const SOUNDCLOUD_HOME = "https://soundcloud.com/";
 const READY_TIMEOUT_MS = 15_000;
@@ -21,6 +23,11 @@ const RESOLVE_TIMEOUT_MS = 20_000;
 
 let windowPromise: Promise<BrowserWindow> | null = null;
 let captureInstalled = false;
+let resolverWindow: BrowserWindow | undefined;
+const resolverIdle = new IdleRelease(() => {
+  const win = resolverWindow;
+  if (win && !win.isDestroyed() && !win.isVisible()) win.destroy();
+});
 /** The native DataDome client-id, captured from the SoundCloud app's own api-v2 requests. */
 let capturedDatadomeClientId: string | undefined;
 
@@ -150,13 +157,26 @@ async function ensureWindow(oauthToken?: string): Promise<BrowserWindow> {
         backgroundThrottling: false
       }
     });
+    resolverWindow = win;
+    win.once("closed", () => {
+      if (resolverWindow === win) {
+        resolverIdle.cancel();
+        resolverWindow = undefined;
+        windowPromise = null;
+        capturedDatadomeClientId = undefined;
+      }
+    });
     guardSoundCloudWindow(win);
     win.webContents.setAudioMuted(true);
     log("loading soundcloud.com in hidden window…");
     await win.loadURL(SOUNDCLOUD_HOME).catch((error) => log("loadURL error", error));
     await waitForReady();
     return win;
-  })();
+  })().catch((error) => {
+    resolverWindow?.destroy();
+    windowPromise = null;
+    throw error;
+  });
 
   return windowPromise;
 }
@@ -179,37 +199,47 @@ export async function resolveMediaInPage(opts: {
   if (!isTrustedSoundCloudUrl(opts.url, true)) {
     throw new Error("SoundCloud returned an untrusted media URL.");
   }
-  const win = await ensureWindow(opts.oauthToken);
-  if (!isTrustedSoundCloudUrl(win.webContents.getURL())) {
-    throw new Error("SoundCloud resolver window left its trusted origin.");
+  const finish = resolverIdle.begin();
+  let fetchStarted = false;
+  try {
+    const win = await ensureWindow(opts.oauthToken);
+    if (!isTrustedSoundCloudUrl(win.webContents.getURL())) {
+      throw new Error("SoundCloud resolver window left its trusted origin.");
+    }
+    const headers: Record<string, string> = { Authorization: `OAuth ${opts.oauthToken}` };
+    if (capturedDatadomeClientId) {
+      headers["x-datadome-clientid"] = capturedDatadomeClientId;
+    }
+    log(`in-page resolve (clientId=${capturedDatadomeClientId ? "present" : "MISSING"}) -> ${opts.url.split("?")[0]}`);
+    const js = `
+      (async () => {
+        try {
+          const res = await fetch(${JSON.stringify(opts.url)}, {
+            method: "GET",
+            headers: ${JSON.stringify(headers)},
+            credentials: "include"
+          });
+          const body = await res.text();
+          return { status: res.status, body: body, sentClientId: ${JSON.stringify(Boolean(capturedDatadomeClientId))} };
+        } catch (e) {
+          return { status: -1, body: String((e && e.message) || e), sentClientId: false };
+        }
+      })()
+    `;
+    const exec = win.webContents.executeJavaScript(js, true) as Promise<InPageResponse>;
+    fetchStarted = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<InPageResponse>((_, reject) => {
+      timer = setTimeout(() => reject(new Error("in-page resolve timed out")), RESOLVE_TIMEOUT_MS);
+    });
+    exec.finally(finish).catch(() => undefined);
+    const result = await Promise.race([exec, timeout]).finally(() => clearTimeout(timer));
+    log(`in-page resolve result: status=${result.status} sentClientId=${result.sentClientId}`);
+    return result;
+  } catch (error) {
+    if (!fetchStarted) finish();
+    throw error;
   }
-  const headers: Record<string, string> = { Authorization: `OAuth ${opts.oauthToken}` };
-  if (capturedDatadomeClientId) {
-    headers["x-datadome-clientid"] = capturedDatadomeClientId;
-  }
-  log(`in-page resolve (clientId=${capturedDatadomeClientId ? "present" : "MISSING"}) -> ${opts.url.split("?")[0]}`);
-  const js = `
-    (async () => {
-      try {
-        const res = await fetch(${JSON.stringify(opts.url)}, {
-          method: "GET",
-          headers: ${JSON.stringify(headers)},
-          credentials: "include"
-        });
-        const body = await res.text();
-        return { status: res.status, body: body, sentClientId: ${JSON.stringify(Boolean(capturedDatadomeClientId))} };
-      } catch (e) {
-        return { status: -1, body: String((e && e.message) || e), sentClientId: false };
-      }
-    })()
-  `;
-  const exec = win.webContents.executeJavaScript(js, true) as Promise<InPageResponse>;
-  const timeout = new Promise<InPageResponse>((_, reject) =>
-    setTimeout(() => reject(new Error("in-page resolve timed out")), RESOLVE_TIMEOUT_MS)
-  );
-  const result = await Promise.race([exec, timeout]);
-  log(`in-page resolve result: status=${result.status} sentClientId=${result.sentClientId}`);
-  return result;
 }
 
 let probeStarted = false;
@@ -274,6 +304,7 @@ export function isResolverWindowReady(): boolean {
 
 /** Destroy the authenticated resolver context and remove its persistent cookies on sign-out. */
 export async function clearSoundCloudResolverSession(): Promise<void> {
+  resolverIdle.cancel();
   const pendingWindow = windowPromise;
   windowPromise = null;
   capturedDatadomeClientId = undefined;

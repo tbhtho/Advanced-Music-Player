@@ -399,36 +399,58 @@ function SongColor() {
     document.documentElement.style.setProperty("--beat-intensity", String(beatIntensity));
   }, [beatIntensity]);
 
-  // Audio-reactive accent + beat-pulsed gradient. The reactor reads AMP's output via Windows
-  // system-audio loopback for EVERY source (Spotify + SoundCloud alike) — it deliberately no longer
-  // taps the SoundCloud media element, because routing playback through Web Audio silenced/locked
-  // certain SoundCloud streams. The reactor writes CSS vars per animation frame — no React renders.
+  // Ambient drift follows the existing colour preference and sleeps when the document is hidden.
   useEffect(() => {
-    if (accentSource !== "audio" || runtime?.platform !== "win32" || status !== "playing") {
-      audioReactor.stop();
-      return;
-    }
-    audioReactor.start();
-    return () => audioReactor.stop();
-  }, [accentSource, runtime?.platform, status]);
-
-  // Leaving audio mode releases the system-audio capture entirely (and re-arms a future retry).
-  useEffect(() => {
-    if (accentSource !== "audio") {
-      audioReactor.releaseLoopback();
-    }
+    const root = document.documentElement;
+    const sync = () => {
+      root.dataset.accentSource = accentSource;
+      root.dataset.ambientMotion = accentSource !== "static" && !document.hidden ? "running" : "paused";
+    };
+    sync();
+    document.addEventListener("visibilitychange", sync);
+    return () => {
+      document.removeEventListener("visibilitychange", sync);
+      delete root.dataset.accentSource;
+      delete root.dataset.ambientMotion;
+    };
   }, [accentSource]);
 
-  // A saved audio-reactive preference still needs one fresh user gesture after restart before
-  // Chromium will grant loopback. Prime on the next click or tap anywhere in AMP.
+  // Capture and visual work exist only during visible playback. Media playback is independent.
   useEffect(() => {
     if (accentSource !== "audio" || runtime?.platform !== "win32") {
+      audioReactor.stop();
+      audioReactor.releaseLoopback();
       return;
     }
-    const prime = () => audioReactor.primeLoopback();
-    window.addEventListener("pointerdown", prime, { capture: true, once: true });
-    return () => window.removeEventListener("pointerdown", prime, { capture: true });
-  }, [accentSource, runtime?.platform]);
+    let releaseTimer: ReturnType<typeof setTimeout> | undefined;
+    const sync = () => {
+      clearTimeout(releaseTimer);
+      if (status === "playing" && !document.hidden) audioReactor.start();
+      else {
+        audioReactor.stop();
+        if (document.hidden) audioReactor.releaseLoopback();
+        else releaseTimer = setTimeout(() => audioReactor.releaseLoopback(), 1500);
+      }
+    };
+    // A play gesture may precede the store's async playback transition; allow that gesture,
+    // then release immediately if playback did not start. Never capture ordinary paused clicks.
+    const prime = (event: PointerEvent) => {
+      const target = event.target instanceof Element ? event.target.closest('button') : null;
+      if (status === "playing" || /\bplay\b/i.test(target?.getAttribute('aria-label') ?? target?.textContent ?? "")) {
+        audioReactor.primeLoopback();
+      }
+    };
+    sync();
+    document.addEventListener("visibilitychange", sync);
+    window.addEventListener("pointerdown", prime, { capture: true });
+    return () => {
+      document.removeEventListener("visibilitychange", sync);
+      window.removeEventListener("pointerdown", prime, { capture: true });
+      clearTimeout(releaseTimer);
+      audioReactor.stop();
+    };
+  }, [accentSource, runtime?.platform, status]);
+  useEffect(() => () => audioReactor.releaseLoopback(), []);
 
   // Artwork colour is the baseline (and the full answer in "artwork" mode, or for Spotify).
   // "static" mode opts out entirely: the UI stays on the fixed neutral accent regardless of art.
@@ -583,27 +605,13 @@ export function App() {
   return (
     <MotionConfig reducedMotion="user">
     <HashRouter>
-      <div className="flex h-screen flex-col overflow-hidden text-[var(--ink)]">
-        {/* Two viewport-fixed background layers behind everything (body paints --shell). The side
-            panels are translucent (see .glass-panel) so both show through them — one continuous
-            top-left song sky across sidebar → content → Now Playing rail.
-            Layer 1: the static base wash (transitions colour per track, never per frame).
-            Layer 2: the beat glow — the audio reactor writes --beat/--energy (0 when idle/paused/
-            artwork mode) and ONLY this layer's opacity + transform read them. Both are GPU-
-            composited, so the pulse costs no layout or paint and never restyles the rest of the UI
-            (rewriting app-wide accent vars per frame was what made the app lag). */}
-        <div
-          aria-hidden
-          className="pointer-events-none fixed inset-0 -z-10 transition-[background] duration-700"
-          style={{
-            background:
-              "transparent"
-          }}
-        />
+      <div className="amp-shell relative isolate flex h-screen flex-col overflow-hidden text-[var(--ink)]">
+        <div className="amp-ambient-layer" aria-hidden />
+        {/* One bounded audio-reactive overlay above the native window material. */}
         <div
           id="amp-beat-layer"
           aria-hidden
-          className="pointer-events-none fixed inset-0 -z-10"
+          className="pointer-events-none absolute inset-0 -z-10"
           style={{
             background:
               "radial-gradient(150% 105% at 0% -12%, rgba(var(--song-rgb), 0.55), rgba(var(--song-rgb), 0.16) 46%, transparent 72%)",
@@ -624,26 +632,19 @@ export function App() {
             showQueue ? "grid-cols-[196px_minmax(0,1fr)_300px]" : "grid-cols-[196px_minmax(0,1fr)]"
           )}
         >
-          <motion.aside
-            variants={panelVariants.left}
-            initial="initial"
-            animate="animate"
-            transition={spring.panel}
+          <aside
             className="amp-sidebar vibrancy glass-panel overflow-hidden"
           >
             <Sidebar />
-          </motion.aside>
-          <motion.main
-            initial={panelVariants.rise.initial}
-            animate={panelVariants.rise.animate}
-            transition={{ ...spring.panel, delay: 0.04 }}
+          </aside>
+          <main
             className="amp-main flex min-h-0 min-w-0 flex-col"
           >
             <NoticeBanner />
             <div className="amp-page-scroll min-h-0 flex-1 overflow-y-auto">
               {/* No AnimatePresence/mode="wait" here: waiting for the outgoing page's exit to finish
                   before mounting the next one added ~200ms of dead air to every tab switch. Each
-                  PageFrame fades itself in on mount (keyed by title), so the new page appears at once
+                  PageFrame renders immediately, so the new page appears at once
                   and the old one is dropped in the same commit — snappy, and never two pages stacked. */}
               <Routes>
                 <Route path="/" element={<PageFrame title="Home"><HomePage /></PageFrame>} />
@@ -657,17 +658,13 @@ export function App() {
                 <Route path="/settings" element={<PageFrame title="Settings"><SettingsPage /></PageFrame>} />
               </Routes>
             </div>
-          </motion.main>
+          </main>
           {showQueue ? (
-            <motion.aside
-              variants={panelVariants.right}
-              initial="initial"
-              animate="animate"
-              transition={{ ...spring.panel, delay: 0.04 }}
+            <aside
               className="vibrancy glass-panel min-h-0 overflow-hidden border-l border-[var(--edge)]"
             >
               <NowPlayingPanel />
-            </motion.aside>
+            </aside>
           ) : null}
         </div>
         <PlayerBar
@@ -1811,22 +1808,23 @@ function NowPlayingPanel() {
                 openTrackMenu(track, event.clientX, event.clientY, { source: "queue", queueIndex: index });
               }}
               className={cn(
-                "flex w-full cursor-grab items-center gap-2 rounded-[var(--radius-sm)] border border-l-2 p-1.5 text-left transition active:cursor-grabbing",
+                "amp-queue-row flex w-full cursor-grab items-center gap-2 rounded-[var(--radius-sm)] border p-1.5 text-left transition active:cursor-grabbing",
                 index === currentIndex
                   ? "border-[var(--acid)]/50 bg-[var(--paper)]/8"
                   : "border-transparent hover:bg-white/5",
                 dragIndex === index && "opacity-40",
                 overIndex === index && dragIndex !== null && dragIndex !== index && "ring-1 ring-[var(--acid)]/60"
               )}
-              // A soft, desaturated left edge quietly hints at the source (Spotify vs SoundCloud).
-              style={{ borderLeftColor: `color-mix(in srgb, var(--${track.provider}-tint) 42%, transparent)` }}
+              data-provider={track.provider}
+              aria-current={index === currentIndex ? "true" : undefined}
+              aria-label={`Play ${displayTitle(track.title)} by ${displayCreators(track.creators)} on ${providerLabel(track.provider)}`}
             >
               <span className="grid h-6 w-6 shrink-0 place-items-center rounded-[var(--radius-sm)] bg-[var(--paper)]/8 text-[10px] text-[var(--muted)]">
                 {index + 1}
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-xs text-[var(--paper)]">{displayTitle(track.title)}</p>
-                <p className="truncate text-[10px] text-[var(--muted)]">{displayCreators(track.creators)}</p>
+                <p className="truncate text-[10px] text-[var(--muted)]">{displayCreators(track.creators)} <span className="amp-queue-provider">· {providerLabel(track.provider)}</span></p>
               </div>
             </button>
           ))
@@ -1861,10 +1859,10 @@ function TransportButton({
       whileTap={disabled ? undefined : { scale: 0.92 }}
       transition={spring.press}
       className={cn(
-        "grid place-items-center rounded-full border",
+        "amp-transport grid place-items-center rounded-full border",
         emphasis
-          ? "h-10 w-10 border-transparent bg-[var(--acid)] text-[var(--shell)] shadow-[var(--shadow-glow)] hover:brightness-105"
-          : "h-9 w-9 border-[var(--edge)] bg-[var(--panel)] text-[var(--paper)] hover:border-[var(--acid)]/60 hover:bg-[var(--panel-soft)]",
+          ? "amp-transport-emphasis h-10 w-10"
+          : "h-9 w-9",
         disabled && "cursor-not-allowed opacity-40"
       )}
     >
@@ -1925,22 +1923,10 @@ function NoticeBanner() {
 
 function PageFrame({ title, children, fill }: { title: string; children: ReactNode; fill?: boolean }) {
   return (
-    <motion.section
-      key={title}
-      // Opacity-only fade on mount — no `scale`, no `exit`. Animating `scale` meant transforming the
-      // entire (often large) page subtree on the very frame it first mounts and paints, which dropped
-      // frames mid-transition; opacity alone is a pure compositor cross-fade. Dropping `exit` lets the
-      // previous page unmount in the same commit (no wait, no two-pages-stacked layout jump).
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={tween.quick}
-      // `fill` pages own their scrolling (e.g. Library's virtualized list): the frame pins itself
-      // to the route container's exact height so the outer page scrollbar never engages.
-      className={fill ? "amp-page flex h-full min-h-0 flex-col gap-4" : "amp-page space-y-5"}
-    >
+    <section key={title} className={cn(fill ? "amp-page flex h-full min-h-0 flex-col gap-4" : "amp-page space-y-5", title === "Library" && "amp-page-library")}>
       <h2 className="amp-page-title shrink-0">{title}</h2>
       {children}
-    </motion.section>
+    </section>
   );
 }
 
@@ -2266,10 +2252,11 @@ function TrackGrid({
                 <button
                   type="button"
                   title="Play"
+                  aria-label={`Play ${displayTitle(track.title)}`}
                   onClick={() => onPlay(track)}
                   className="amp-icon-button amp-icon-primary"
                 >
-                  <Play className="h-3.5 w-3.5" />
+                  <Play className="h-3.5 w-3.5 translate-x-px fill-current" />
                 </button>
                 <button
                   type="button"
@@ -2376,9 +2363,8 @@ function TrackListRowBase({
 
   const openTrackMenu = useAppStore((state) => state.openTrackMenu);
 
-  // Provider colour is confined to a small marker; row surfaces and titles stay neutral.
+  // Soft source blooms share the queue material; text remains the provider cue.
   const tintVar = `--${track.provider}-tint`;
-  const isNeutralRow = Boolean(selected) || Boolean(isActive);
 
   return (
     <div
@@ -2395,9 +2381,8 @@ function TrackListRowBase({
             : "bg-transparent",
         !track.playable && "opacity-45"
       )}
-      style={
-        isNeutralRow ? undefined : { borderColor: "var(--hairline)" }
-      }
+      data-provider={track.provider}
+      data-active={Boolean(selected || isActive)}
     >
       {selecting ? (
         <button
@@ -2440,7 +2425,7 @@ function TrackListRowBase({
             Go+
           </span>
         ) : null}
-        <span className="amp-provider-dot" title={providerLabel(track.provider)} aria-label={providerLabel(track.provider)} style={{ backgroundColor: `var(${tintVar})` }} />
+        <span className="amp-provider-mark"><span className="amp-provider-dot" aria-hidden style={{ backgroundColor: `var(${tintVar})` }} />{providerLabel(track.provider)}</span>
         <span className="shrink-0 text-xs text-[var(--faint)]">{formatDuration(track.durationMs)}</span>
       </button>
       {onAdd ? (
@@ -3495,7 +3480,7 @@ function SearchPage() {
       <SectionCard>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="w-full max-w-3xl">
-            <div className="flex items-center gap-3 rounded-[var(--radius)] border border-[var(--edge)] bg-[var(--panel)] px-4 py-2.5 transition-colors focus-within:border-[var(--edge-strong)]">
+            <div className="amp-search-field flex items-center gap-3 rounded-[var(--radius)] border px-4 py-2.5 transition-colors">
               <Search className="h-4 w-4 text-[var(--muted)]" />
               <input
                 value={query}
@@ -3521,12 +3506,8 @@ function SearchPage() {
                 // Only flip the provider — the debounced effect below re-runs the query once.
                 // Calling searchAction here too used to double-fire every chip click.
                 onClick={() => setSearchProvider(provider)}
-                className={cn(
-                  "rounded-full px-4 py-2 text-sm font-medium transition",
-                  storeProvider === provider
-                    ? "bg-[var(--acid)] text-[var(--shell)]"
-                    : "border border-[var(--edge)] bg-[var(--panel)] text-[var(--muted)]"
-                )}
+                className="amp-provider-chip"
+                data-provider={provider}
               >
                 {provider === "all" ? "All" : providerLabel(provider)}
               </button>
@@ -3744,7 +3725,7 @@ function LibraryPage() {
     <>
       {/* min-h-0 flex-1 inside the fill PageFrame: exact available height, so the VirtualList is
           the ONLY scroller — no second page-level scrollbar fighting it. */}
-      <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <div className="amp-library flex min-h-0 flex-1 flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             <SectionHeader title="Your library" />
@@ -3823,21 +3804,8 @@ function LibraryPage() {
                   // let "Add to playlist" silently include tracks the new tab hides.
                   exitSelection();
                 }}
-                className={cn(
-                  "rounded-full border px-4 py-1.5 text-sm font-medium transition",
-                  active && !tab.tint
-                    ? "border-[var(--acid)] bg-[var(--acid)] text-[var(--shell)]"
-                    : active
-                      ? "border-transparent text-[var(--shell)]"
-                      : "border-[var(--edge)] text-[var(--muted)] hover:text-[var(--paper)]"
-                )}
-                style={
-                  active && tab.tint
-                    ? { backgroundColor: `var(${tab.tint})`, borderColor: `var(${tab.tint})` }
-                    : !active && tab.tint
-                      ? { color: `color-mix(in srgb, var(${tab.tint}) 60%, var(--paper))` }
-                      : undefined
-                }
+                className="amp-provider-chip"
+                data-provider={tab.id}
               >
                 {tab.label}
               </button>
@@ -3893,7 +3861,7 @@ function LibraryPage() {
           onChange={(event) => setFilter(event.target.value)}
           aria-label="Search your library"
           placeholder="Search your library…"
-          className="shrink-0 rounded-[var(--radius)] border border-[var(--edge)] bg-[var(--panel)] px-4 py-2.5 text-sm text-[var(--paper)] outline-none placeholder:text-[var(--muted)]"
+          className="amp-search-input shrink-0 rounded-[var(--radius)] border px-4 py-2.5 text-sm text-[var(--paper)] outline-none placeholder:text-[var(--muted)]"
         />
 
         {allItems.length ? (
@@ -3906,7 +3874,7 @@ function LibraryPage() {
 
         {displayedItems.length ? (
           <VirtualList
-            className="min-h-0 flex-1 overflow-y-auto pr-1"
+            className="amp-library-tracks min-h-0 flex-1 overflow-y-auto"
             items={displayedItems}
             rowHeight={64}
             getKey={(track) => track.id}
@@ -5017,8 +4985,8 @@ function AppearanceCard() {
   const setBeatIntensity = useAppStore((state) => state.setBeatIntensity);
 
   const options: { id: AccentSource; label: string; hint: string }[] = [
-    { id: "artwork", label: "Album art", hint: "Accent taken from the cover image." },
-    { id: "audio", label: "Song audio", hint: "Gradient and accent pulse on the beat." },
+    { id: "artwork", label: "Album art", hint: "Cover colour with slowly drifting ambient light." },
+    { id: "audio", label: "Song audio", hint: "Drifting cover light and accent pulse on the beat." },
     { id: "static", label: "Static", hint: "Fixed neutral accent — no colour or pulse." }
   ];
   const visibleOptions = options.filter(

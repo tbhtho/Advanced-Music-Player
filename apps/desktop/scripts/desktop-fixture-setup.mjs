@@ -3,7 +3,7 @@ const delay = (ms, signal) => new Promise((resolve, reject) => {
   const timer = setTimeout(resolve, ms);
   signal?.addEventListener("abort", () => { clearTimeout(timer); reject(signal.reason); }, { once: true });
 });
-const track = (id, provider = "spotify", prefix = "Fixture") => ({ id: `${provider}:${id}`, provider, providerTrackId: String(id), title: `${prefix} song ${id}`, creators: [`Fixture artist ${Number(id) % 8}`], durationMs: 180000, explicit: false, playable: true });
+const track = createDemoTrack;
 const tracks = Array.from({ length: 120 }, (_, i) => track(i, i % 2 ? "soundcloud" : "spotify"));
 const now = new Date().toISOString();
 localStorage.clear();
@@ -20,9 +20,9 @@ window.fetch = async (input, init = {}) => {
   const query = url.searchParams.get("q") ?? "";
   try { await delay(searching ? query === "slow" ? 300 : 90 : 120, init.signal); }
   catch (error) { window.__AMP_FIXTURE__.fetchAborts++; throw error; }
-  const items = tracks.filter((item) => item.provider === "spotify").map((item) => ({ id: item.providerTrackId, name: item.title, duration_ms: item.durationMs, artists: [{ id: "fixture-artist", name: item.creators[0] }] }));
+  const items = tracks.filter((item) => item.provider === "spotify").map((item) => ({ id: item.providerTrackId, name: item.title, duration_ms: item.durationMs, artists: [{ id: "fixture-artist", name: item.creators[0] }], album:{id:"fixture-album",name:item.album,images:[{url:item.artworkUrl,width:640,height:640}]} }));
   let body;
-  if (searching) body = { tracks: { items: Array.from({ length: 18 }, (_, i) => ({ id: `search-${query}-${i}`, name: `${query} Spotify ${i}`, duration_ms: 180000, artists: [{ name: "Fixture artist" }] })) } };
+  if (searching) body = { tracks: { items: Array.from({ length: 18 }, (_, i) => {const item=track(`search-${query}-${i}`,"spotify",query);return {id:item.providerTrackId,name:item.title,duration_ms:item.durationMs,artists:[{name:item.creators[0]}],album:{id:"demo-"+i,name:item.album,images:[{url:item.artworkUrl,width:640,height:640}]}};}) } };
   else if (url.pathname.endsWith("/me/playlists")) body = { items: [] };
   else if (url.pathname.endsWith("/me/tracks")) body = { total: items.length, items: items.map((item) => ({ track: item })) };
   else if (url.pathname.endsWith("/artists")) body = { artists: [] };

@@ -12,13 +12,13 @@ Spotify, SoundCloud, YouTube, and your local music in one library, with mixed pl
 
 ## Get AMP
 
-**Windows:** [Download AMP 0.3.6](https://github.com/tbhtho/Advanced-Music-Player/releases/download/v0.3.6/AMP.Setup.0.3.6.exe) · [Release notes and checksums](https://github.com/tbhtho/Advanced-Music-Player/releases/tag/v0.3.6).
+**Windows:** [Download AMP 0.3.7](https://github.com/tbhtho/Advanced-Music-Player/releases/download/v0.3.7/AMP.Setup.0.3.7.exe) · [Release notes and checksums](https://github.com/tbhtho/Advanced-Music-Player/releases/tag/v0.3.7).
 
 The installer uses production castLabs VMP signing. Windows publisher signing is not configured, so SmartScreen may show a warning. To run the current source, follow the [development setup](docs/DEVELOPMENT.md).
 
 <p align="center">
-  <a href="docs/screenshots/playlists-0.3.5.png"><img src="docs/screenshots/playlists-0.3.5.png" width="960" alt="AMP 0.3.5 playlist editor with compact controls and sample Spotify and SoundCloud tracks"></a><br>
-  <sub>Mixed-provider playlists with compact controls.</sub>
+  <a href="docs/screenshots/library-0.3.7.png"><img src="docs/screenshots/library-0.3.7.png" width="960" alt="AMP 0.3.7 Library with attached glass surfaces and fictional Spotify and SoundCloud tracks"></a><br>
+  <sub>Continuous Library, sidebar and Now Playing with subtle provider blooms.</sub>
 </p>
 
 <table>
@@ -28,7 +28,7 @@ The installer uses production castLabs VMP signing. Windows publisher signing is
   </tr>
 </table>
 
-Screenshots show the released 0.3.5 interface with sample tracks, playlists and account states. Select an image to view it at full size. [Capture details](docs/screenshots/README.md).
+The Library capture shows 0.3.7 with fictional demo tracks and original sample covers; the Home and Settings captures show the earlier 0.3.5 interface with sample states. Select an image to view it at full size. [Capture details](docs/screenshots/README.md).
 
 ## Quick start
 

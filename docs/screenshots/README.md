@@ -1,4 +1,9 @@
-# AMP 0.3.5 screenshots
+# AMP screenshots
+
+[Library 0.3.7](library-0.3.7.png) is a native-window capture of the release frontend in an isolated offline preview. It shows the final subtle track blooms, attached surfaces and original fictional artwork. Playback and external requests are disabled in this fixture. No real library, accounts or credentials appear. A still capture does not verify animation or external wallpaper blur; Static, reduced-motion and hidden-window behavior were checked separately in the running renderer.
+
+The older captures below show 0.3.5.
+
 
 These are actual captures of AMP's released frontend code, displayed in an isolated preview with sample tracks, playlists, artwork and provider account states. They show Home, the playlist editor and Settings. No personal library, credentials or live playback appear in the images. The external desktop backdrop is not included in these captures.
 

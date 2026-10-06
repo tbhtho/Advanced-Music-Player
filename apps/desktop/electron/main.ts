@@ -43,6 +43,8 @@ import { clearSoundCloudResolverSession } from "./SoundCloudResolverWindow.js";
 import { applyWindowMaterial, selectWindowMaterial, type WindowMaterial } from "./windowMaterial.js";
 import { createStoredProviderRuntimeStatus, requireSpotifyClientId, type ProviderRuntimeOAuthStatus } from "./providerOAuthStatus.js";
 
+import { IdleRelease } from "./idleRelease.js";
+
 let windowMaterial: WindowMaterial = "opaque";
 
 type Provider = "spotify" | "soundcloud";
@@ -3340,6 +3342,13 @@ async function setSoundCloudWebTrackLiked(request: SoundCloudTrackLikeRequest) {
 // the 403 that blocks api-v2 like writes made from outside a real browser.
 let soundCloudLikeWindow: BrowserWindow | undefined;
 let soundCloudLikeWindowReady: Promise<BrowserWindow> | undefined;
+const soundCloudLikeIdle = new IdleRelease(() => {
+  const win = soundCloudLikeWindow;
+  if (win && !win.isDestroyed() && !win.isVisible()) {
+    // Keep the persistent authenticated partition; only retire its renderer.
+    win.destroy();
+  }
+});
 
 function isTrustedSoundCloudPage(rawUrl: string): boolean {
   try {
@@ -3377,6 +3386,7 @@ async function ensureSoundCloudLikeWindow(): Promise<BrowserWindow> {
         }
       });
       win.on("closed", () => {
+        soundCloudLikeIdle.cancel();
         soundCloudLikeWindow = undefined;
         soundCloudLikeWindowReady = undefined;
       });
@@ -3441,6 +3451,7 @@ async function setSoundCloudLocalTrackLikedViaAppWindow(
   if (!providerGateway) {
     return { ok: false, error: "Provider gateway is not ready.", source: "fallback" as const };
   }
+  const finish = soundCloudLikeIdle.begin();
   try {
     // Keep the app's injected session cookie fresh, fetch the client_id, then run the like from
     // inside the real soundcloud.com page.
@@ -3534,6 +3545,8 @@ async function setSoundCloudLocalTrackLikedViaAppWindow(
       error: error instanceof Error ? error.message : "SoundCloud like failed.",
       source: "internal" as const
     };
+  } finally {
+    finish();
   }
 }
 
@@ -3594,6 +3607,7 @@ async function createMainWindow() {
     show: false,
     backgroundColor: preferredMaterial === "opaque" ? "#101012" : "#00000000",
     transparent: preferredMaterial !== "opaque",
+    ...(process.platform === "win32" ? { thickFrame: true, resizable: true } : {}),
     ...(preferredMaterial === "vibrancy" ? { vibrancy: "under-window" as const, visualEffectState: "active" as const } : {}),
     autoHideMenuBar: true,
     frame: !usesCustomWindowChrome(),
@@ -3619,10 +3633,13 @@ async function createMainWindow() {
       webSecurity: false
     }
   });
-  windowMaterial = applyWindowMaterial(window, preferredMaterial);
-  const updateMaterial = () => {
+  windowMaterial = await applyWindowMaterial(window, preferredMaterial);
+  const updateMaterial = async () => {
     if (window.isDestroyed()) return;
-    windowMaterial = applyWindowMaterial(window, selectWindowMaterial(process.platform, os.release(), nativeTheme.shouldUseHighContrastColors, nativeTheme.prefersReducedTransparency));
+    const nextMaterial = selectWindowMaterial(process.platform, os.release(), nativeTheme.shouldUseHighContrastColors, nativeTheme.prefersReducedTransparency);
+    if (nextMaterial === windowMaterial) return;
+    windowMaterial = await applyWindowMaterial(window, nextMaterial);
+    if (window.isDestroyed()) return;
     window.webContents.send("spot-cloud:window-material-changed", windowMaterial);
   };
   nativeTheme.on("updated", updateMaterial);

@@ -41,7 +41,7 @@ export function DesktopTitleBar({
   }
 
   return (
-    <div className="desktop-drag-region flex h-10 items-center justify-between border-b border-[var(--edge)] bg-[var(--panel-strong)] pl-4 pr-1">
+    <div className="amp-titlebar desktop-drag-region flex h-10 items-center justify-between border-b border-[var(--edge)] pl-4 pr-1">
       <p className="font-display text-[13px] font-semibold tracking-[-0.01em] text-[var(--paper)]">
         {getAppEnv().productName}
       </p>
