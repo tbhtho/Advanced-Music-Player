@@ -6,6 +6,7 @@ export interface GatewayRequest {
   variables?: Record<string, unknown>;
   headers?: Record<string, string>;
   fallback?: "public" | "none";
+  requestId?: string;
 }
 
 export interface GatewayResponse<T = unknown> {
@@ -30,6 +31,7 @@ export interface StealthRequestInit {
   body?: string;
   timeoutMs?: number;
   redirect?: "follow" | "error" | "manual";
+  signal?: AbortSignal;
 }
 
 export interface StealthResponse {

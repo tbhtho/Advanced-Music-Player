@@ -180,12 +180,12 @@ export class SoundCloudPlaybackAdapter implements PlaybackAdapter {
     };
   }
 
-  async search(query: string): Promise<UnifiedTrack[]> {
+  async search(query: string, options?: { signal?: AbortSignal }): Promise<UnifiedTrack[]> {
     const result = await gatewayRequest<UnifiedTrack[]>({
       provider: "soundcloud",
       operation: "search",
       variables: { query }
-    });
+    }, options?.signal);
 
     if (!result.ok || !result.data) {
       throw new Error(result.error ?? "SoundCloud search failed.");
@@ -199,7 +199,7 @@ export class SoundCloudPlaybackAdapter implements PlaybackAdapter {
    * and the SoundCloud side of Daily Mixes. Returns [] on any failure so discovery degrades quietly
    * rather than throwing into the mix builder.
    */
-  async relatedTracks(track: UnifiedTrack): Promise<UnifiedTrack[]> {
+  async relatedTracks(track: UnifiedTrack, options?: { signal?: AbortSignal }): Promise<UnifiedTrack[]> {
     if (track.provider !== "soundcloud") {
       return [];
     }
@@ -208,7 +208,7 @@ export class SoundCloudPlaybackAdapter implements PlaybackAdapter {
       provider: "soundcloud",
       operation: "relatedTracks",
       variables: { track, limit: 20 }
-    });
+    }, options?.signal);
     return result.ok && result.data ? result.data : [];
   }
 

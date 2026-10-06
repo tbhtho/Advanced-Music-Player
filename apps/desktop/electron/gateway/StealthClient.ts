@@ -28,6 +28,7 @@ export class StealthClient {
   }
 
   async request(url: string, init: StealthRequestInit = {}): Promise<StealthResponse> {
+    init.signal?.throwIfAborted();
     return new Promise((resolve, reject) => {
       const method = init.method ?? "GET";
       const clientRequest = net.request({
@@ -66,7 +67,7 @@ export class StealthClient {
         timeout = setTimeout(() => {
           finish(() => {
             clientRequest.abort();
-            reject(new Error(`Request timeout: ${url}`));
+            reject(new Error("Request timed out."));
           });
         }, timeoutMs);
       };
@@ -76,13 +77,21 @@ export class StealthClient {
         }
         settled = true;
         clearTimeout(timeout);
+        init.signal?.removeEventListener("abort", abort);
         settle();
       };
+      const abort = () => finish(() => {
+        clientRequest.abort();
+        reject(init.signal?.reason ?? new DOMException("Cancelled", "AbortError"));
+      });
+      init.signal?.addEventListener("abort", abort, { once: true });
       armTimeout();
 
-      let body = "";
+      const chunks: Buffer[] = [];
+      let bodyBytes = 0;
 
       clientRequest.on("response", (response) => {
+        if (settled) return;
         armTimeout();
         // Collect response headers
         const responseHeaders: Record<string, string> = {};
@@ -102,8 +111,10 @@ export class StealthClient {
         }
 
         response.on("data", (chunk: Buffer) => {
+          if (settled) return;
           armTimeout();
-          body += chunk.toString("utf8");
+          chunks.push(chunk);
+          bodyBytes += chunk.length;
         });
 
         response.on("end", () => {
@@ -112,7 +123,8 @@ export class StealthClient {
               status: response.statusCode ?? 0,
               statusText: response.statusMessage ?? "",
               headers: responseHeaders,
-              body
+              // Decode once, so UTF-8 characters split across network chunks remain intact.
+              body: Buffer.concat(chunks, bodyBytes).toString("utf8")
             })
           );
         });

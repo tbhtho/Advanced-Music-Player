@@ -1,12 +1,21 @@
 import { contextBridge, ipcRenderer } from "electron";
 
 contextBridge.exposeInMainWorld("spotCloud", {
+  windowMaterial: {
+    initial: process.argv.find((argument) => argument.startsWith("--amp-window-material="))?.split("=")[1] ?? "opaque",
+    get: () => ipcRenderer.invoke("spot-cloud:get-window-material"),
+    onChanged: (callback: (material: "opaque" | "acrylic" | "vibrancy") => void) => {
+      const listener = (_event: unknown, material: "opaque" | "acrylic" | "vibrancy") => callback(material);
+      ipcRenderer.on("spot-cloud:window-material-changed", listener);
+      return () => ipcRenderer.removeListener("spot-cloud:window-material-changed", listener);
+    }
+  },
   runtime: {
     getInfo: () => ipcRenderer.invoke("spot-cloud:get-runtime-info"),
     reload: () => ipcRenderer.invoke("spot-cloud:reload-runtime")
   },
   gateway: {
-    request: (req: { provider: "spotify" | "soundcloud" | "deezer" | "youtube"; operation: string; variables?: Record<string, unknown> }) =>
+    request: (req: { provider: "spotify" | "soundcloud" | "deezer" | "youtube"; operation: string; variables?: Record<string, unknown>; requestId?: string }) =>
       ipcRenderer.invoke("spot-cloud:gateway-request", req)
   },
   config: {

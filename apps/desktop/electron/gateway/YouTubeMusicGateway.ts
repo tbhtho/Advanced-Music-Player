@@ -1,6 +1,7 @@
 import type { UnifiedTrack } from "@amp/core";
 import type { CacheStore } from "./CacheStore";
 import type { GatewayResponse } from "./types";
+import { SharedRequests } from "@amp/core";
 
 /*
  * YouTube Music SEARCH via youtubei.js (Innertube). Playback does NOT happen here — it runs through
@@ -30,6 +31,7 @@ export class YouTubeMusicGateway {
   private cache: CacheStore;
   private innertube: Innertube | undefined;
   private innertubePromise: Promise<Innertube> | undefined;
+  private searches = new SharedRequests<GatewayResponse<UnifiedTrack[]>>();
 
   constructor(cache: CacheStore) {
     this.cache = cache;
@@ -44,7 +46,12 @@ export class YouTubeMusicGateway {
     }
   }
 
-  async search(query: string): Promise<GatewayResponse<UnifiedTrack[]>> {
+  search(query: string, signal?: AbortSignal): Promise<GatewayResponse<UnifiedTrack[]>> {
+    return this.searches.run(query.trim().toLowerCase(), (sharedSignal) => this.searchOnce(query, sharedSignal), signal);
+  }
+
+  private async searchOnce(query: string, signal: AbortSignal): Promise<GatewayResponse<UnifiedTrack[]>> {
+    signal.throwIfAborted();
     const q = query.trim();
     if (!q) {
       return { ok: true, data: [], source: "internal" };
@@ -57,6 +64,7 @@ export class YouTubeMusicGateway {
 
     try {
       const yt = await this.ensureInnertube();
+      signal.throwIfAborted();
       const results = await yt.music.search(q, { type: "song" });
       const songs: YouTubeSong[] =
         results.songs?.contents ??
@@ -66,6 +74,7 @@ export class YouTubeMusicGateway {
         .filter((song) => song?.id)
         .slice(0, 20)
         .map((song) => mapYouTubeSong(song));
+      signal.throwIfAborted();
       this.cache.set(cacheKey, tracks, SEARCH_CACHE_TTL_MS);
       return { ok: true, data: tracks, source: "internal" };
     } catch (error) {

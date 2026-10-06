@@ -77,12 +77,12 @@ export class YouTubeIframeAdapter implements PlaybackAdapter {
     };
   }
 
-  async search(query: string): Promise<UnifiedTrack[]> {
+  async search(query: string, options?: { signal?: AbortSignal }): Promise<UnifiedTrack[]> {
     const result = await gatewayRequest<UnifiedTrack[]>({
       provider: "youtube",
       operation: "search",
       variables: { query }
-    });
+    }, options?.signal);
     if (!result.ok || !result.data) {
       throw new Error(result.error ?? "YouTube search failed.");
     }

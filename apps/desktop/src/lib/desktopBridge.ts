@@ -118,9 +118,22 @@ export async function gatewayRequest<T = unknown>(req: {
   provider: "spotify" | "soundcloud" | "deezer" | "youtube";
   operation: string;
   variables?: Record<string, unknown>;
-}): Promise<GatewayResponse<T>> {
+}, signal?: AbortSignal): Promise<GatewayResponse<T>> {
+  signal?.throwIfAborted();
   if (hasDesktopBridge()) {
-    return window.spotCloud!.gateway.request(req) as Promise<GatewayResponse<T>>;
+    if (!signal) return window.spotCloud!.gateway.request(req) as Promise<GatewayResponse<T>>;
+    const requestId = crypto.randomUUID();
+    const abort = () => {
+      void window.spotCloud!.gateway.request({ provider: req.provider, operation: "cancelRequest", variables: { requestId } }).catch(() => undefined);
+    };
+    signal.addEventListener("abort", abort, { once: true });
+    try {
+      const result = await window.spotCloud!.gateway.request({ ...req, requestId });
+      signal.throwIfAborted();
+      return result as GatewayResponse<T>;
+    } finally {
+      signal.removeEventListener("abort", abort);
+    }
   }
 
   return {

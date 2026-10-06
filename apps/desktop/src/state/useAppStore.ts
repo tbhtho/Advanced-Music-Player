@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import {
   QueueEngine,
+  mapConcurrent,
   createEmptyPlaybackState,
   createPlaylistEntry,
   reorderPlaylistEntries,
@@ -583,6 +584,7 @@ function getDefaultSearchResults(_projectTracks: ProjectTrack[]): UnifiedTrack[]
 export const useAppStore = create<AppState>((set, get) => {
   let playbackReady = false;
   let activeSearchRequest = 0;
+  let activeSearchAbort: AbortController | undefined;
   // Same stale-response discipline as search(): the most recently opened artist/album wins no
   // matter which network call settles last (rapid "Go to artist" clicks must never flip back).
   let activeArtistRequest = 0;
@@ -615,6 +617,7 @@ export const useAppStore = create<AppState>((set, get) => {
   // In-flight guards: `force` may bypass the freshness check but never overlaps a running build.
   let dailyMixesBuilding = false;
   let stationRequestId = 0;
+  let stationAbort: AbortController | undefined;
 
   const persistPlaylist = async (playlist: UnifiedPlaylist) => {
     await upsertPlaylist(playlist);
@@ -842,7 +845,7 @@ export const useAppStore = create<AppState>((set, get) => {
   };
 
   const getProviderAdapter = (provider: Provider) =>
-    provider === "spotify" ? spotifyAdapter : soundCloudAdapter;
+    provider === "spotify" ? spotifyAdapter : provider === "youtube" ? youTubeAdapter : provider === "local" ? localAdapter : soundCloudAdapter;
 
   const applyFallbackStateForProvider = (
     provider: Provider,
@@ -1070,6 +1073,7 @@ export const useAppStore = create<AppState>((set, get) => {
       sessionGeneration?: number;
     }
   ) => {
+    if (options.sessionGeneration !== undefined && options.sessionGeneration !== providerSessionGeneration.soundcloud) return;
     const likeTracks = profile.likes ?? [];
 
     // Only likes go into the library — not the profile's own uploads — so the Library tab is
@@ -1180,6 +1184,7 @@ export const useAppStore = create<AppState>((set, get) => {
   };
 
   const restoreSoundCloudLibrary = async () => {
+    const sessionGeneration = providerSessionGeneration.soundcloud;
     const currentConnection = get().connections.soundcloud;
     if (
       currentConnection.status === "connected" &&
@@ -1200,6 +1205,7 @@ export const useAppStore = create<AppState>((set, get) => {
         const lastSyncedAt = new Date().toISOString();
         await applySoundCloudProfile(profile.data, {
           source: "local-connect",
+          sessionGeneration,
           notify: false,
           connection: {
             provider: "soundcloud",
@@ -1234,7 +1240,7 @@ export const useAppStore = create<AppState>((set, get) => {
     try {
       const web = await soundCloudWebReload();
       if (web.ok && web.data) {
-        await applySoundCloudProfile(web.data, { source: "web-session", notify: false });
+        await applySoundCloudProfile(web.data, { source: "web-session", notify: false, sessionGeneration });
       }
     } catch {
       // No stored web session — the user connects via browser sign-in or Local Connect instead.
@@ -1307,10 +1313,11 @@ export const useAppStore = create<AppState>((set, get) => {
         applyLoadedState(loadedState);
         set({ bootStage: "Restoring provider sessions", bootProgress: 0.58 });
         await restoreProviderSessions();
-        set({ bootStage: "Syncing Spotify & SoundCloud", bootProgress: 0.78 });
-        await get().hydrateLibraries(true);
-        set({ bootStage: "Loading your SoundCloud likes", bootProgress: 0.92 });
-        await restoreSoundCloudLibrary();
+        // Cached libraries are already available and sessions have been checked. Keep menu access
+        // independent of a large remote-library sync; existing librarySync indicators show progress.
+        void get().hydrateLibraries(true)
+          .then(() => restoreSoundCloudLibrary())
+          .catch((error) => set({ notice: getErrorMessage(error, "Could not refresh provider libraries.") }));
         set({ bootStage: "Ready", bootProgress: 1 });
         initializationSucceeded = true;
       } catch (error) {
@@ -1841,6 +1848,9 @@ export const useAppStore = create<AppState>((set, get) => {
       ensurePlayback();
       const trimmedQuery = query.trim();
       const requestId = ++activeSearchRequest;
+      activeSearchAbort?.abort();
+      const searchAbort = new AbortController();
+      activeSearchAbort = searchAbort;
       set({ searchQuery: query, searchProvider: provider });
 
       if (!trimmedQuery) {
@@ -1881,6 +1891,12 @@ export const useAppStore = create<AppState>((set, get) => {
         : [];
 
       const results: UnifiedTrack[] = [...localResults];
+      const arrived = new Map<Provider, UnifiedTrack[]>();
+      const publishArrived = () => {
+        if (requestId !== activeSearchRequest) return;
+        set({ searchResults: dedupeTracks([...localResults, ...networkTargets.flatMap((target) => arrived.get(target) ?? []), ...catalogResults.slice(0, 50)]).slice(0, 200) });
+      };
+      publishArrived();
       let failedTargets = 0;
 
       const adapterFor = (target: Provider) =>
@@ -1901,16 +1917,22 @@ export const useAppStore = create<AppState>((set, get) => {
             throw new Error(`${providerNames[target]} search isn't available right now.`);
           }
           let timeout: ReturnType<typeof setTimeout> | undefined;
+          const providerAbort = new AbortController();
           try {
             const tracks = await Promise.race([
-              adapter.search(trimmedQuery),
+              adapter.search(trimmedQuery, { signal: AbortSignal.any([searchAbort.signal, providerAbort.signal]) }),
               new Promise<never>((_, reject) => {
                 timeout = setTimeout(
-                  () => reject(new Error(`${providerNames[target]} search timed out. Try again.`)),
+                  () => {
+                    providerAbort.abort();
+                    reject(new Error(`${providerNames[target]} search timed out. Try again.`));
+                  },
                   10_000
                 );
               })
             ]);
+            arrived.set(target, tracks ?? []);
+            publishArrived();
             return { target, tracks: tracks ?? [] };
           } finally {
             if (timeout) {
@@ -2119,6 +2141,7 @@ export const useAppStore = create<AppState>((set, get) => {
     },
 
     async importCollectionAsPlaylist(provider, collectionId, title) {
+      ensurePlayback();
       const adapter = getProviderAdapter(provider);
       if (!adapter) {
         set({ notice: `Connect ${provider} to import playlists.` });
@@ -2577,6 +2600,9 @@ export const useAppStore = create<AppState>((set, get) => {
       // Station discovery is a multi-hop network fan-out — rapid double clicks used to launch
       // overlapping builds that raced each other for lastStation/playback.
       const requestId = ++stationRequestId;
+      stationAbort?.abort();
+      stationAbort = new AbortController();
+      const signal = stationAbort.signal;
       const isCurrentRequest = () => requestId === stationRequestId;
       ensurePlayback();
       set({ notice: `Building a station from "${seed.title}"…` });
@@ -2588,14 +2614,13 @@ export const useAppStore = create<AppState>((set, get) => {
       let scSeed: UnifiedTrack | undefined = seed.provider === "soundcloud" ? seed : undefined;
       if (!scSeed) {
         // Pick the BEST title+artist+duration match, not the top text hit, so the station isn't
-        // anchored on a cover / remix / wrong-language upload with a similar name (the "it just
-        // searched the name" drift). Fall back to an artist-only match, then the raw top hit.
+        // anchored on a cover / remix / wrong-language upload with a similar name.
         const query = `${primaryArtist(seed)} ${seed.title}`.trim();
-        const titleHits = (await soundCloudAdapter?.search(query).catch(() => [])) ?? [];
+        const titleHits = (await soundCloudAdapter?.search(query, { signal }).catch(() => [])) ?? [];
         scSeed = pickBestTwin(seed, titleHits);
         if (!scSeed) {
-          const artistHits = (await soundCloudAdapter?.search(primaryArtist(seed)).catch(() => [])) ?? [];
-          scSeed = pickBestTwin(seed, artistHits, 2);
+          const artistHits = (await soundCloudAdapter?.search(primaryArtist(seed), { signal }).catch(() => [])) ?? [];
+          scSeed = pickBestTwin(seed, artistHits);
         }
       }
 
@@ -2604,14 +2629,19 @@ export const useAppStore = create<AppState>((set, get) => {
       }
 
       const hop1 = dedupeTracks(
-        scSeed ? ((await soundCloudAdapter?.relatedTracks(scSeed).catch(() => [])) ?? []) : []
+        scSeed ? ((await soundCloudAdapter?.relatedTracks(scSeed, { signal }).catch(() => [])) ?? []) : []
       );
       // Widen the hop-2 fan-out a little: with the genre/language gates below, more candidates is
       // safe and gives the scorer more in-lane material to choose from.
-      const hop2Seeds = limitPerArtist(hop1, 1).slice(0, 8);
-      const hop2Pools = await Promise.all(
-        hop2Seeds.map((track) => soundCloudAdapter?.relatedTracks(track).catch(() => []) ?? [])
-      );
+      const expansionGenres = new Set(normalizeGenres([seed.genre, scSeed?.genre]));
+      const hop2Seeds = limitPerArtist(hop1.filter((track) => {
+        const genres = normalizeGenres([track.genre]);
+        return expansionGenres.size === 0 || genres.length === 0 || genres.some((genre) => expansionGenres.has(genre));
+      }), 1).slice(0, 8);
+      const hop2Pools = await mapConcurrent(hop2Seeds, 3, (track) => {
+        signal.throwIfAborted();
+        return soundCloudAdapter?.relatedTracks(track, { signal }).catch(() => []) ?? Promise.resolve([]);
+      });
       if (!isCurrentRequest()) {
         return;
       }
@@ -2648,7 +2678,7 @@ export const useAppStore = create<AppState>((set, get) => {
         spotify && get().connections.spotify.status === "connected"
           ? await Promise.all(
               [seedArtistName, ...neighbourNames].map((artist) =>
-                spotify.search(`artist:"${artist}"`).catch(() => [])
+                spotify.search(`artist:"${artist}"`, { signal }).then((tracks) => tracks.filter((track) => normalizeArtist(primaryArtist(track)) === normalizeArtist(artist))).catch(() => [])
               )
             )
           : [];
@@ -2658,7 +2688,7 @@ export const useAppStore = create<AppState>((set, get) => {
 
       // Build the candidate pool first — the vibe/genre/language signals below need every candidate.
       const rawPool = dedupeTracks([...hop1, ...hop2, ...spotifyPools.flat()]).filter(
-        (track) => track.playable && trackKey(track) !== trackKey(seed)
+        (track) => track.playable && crossProviderKey(track) !== crossProviderKey(seed)
       );
 
       // ---- Shared enrichment signals: tempo/loudness (Deezer) + normalized genres + language. ----

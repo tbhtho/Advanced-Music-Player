@@ -1,0 +1,3490 @@
+{
+  "baselineCommit": "59cf03567b624572a24b8fee7d982589e3cb16dd",
+  "date": "2026-10-06",
+  "methodology": "Three interleaved samples per source/mode. Backend uses Node v24.18.0 --expose-gc with 15ms synthetic network latency. Desktop uses castLabs Electron 41.10.7+wvcus, disposable profiles, 120 synthetic cached tracks, fake token/session, blocked external requests, no playback, and offscreen rendering capped at 60fps. No foreground DWM/backdrop cost, installed AMP binary, CDM, real accounts or provider-service timings measured.",
+  "backendSummary": {
+    "spotifyDiscoveryCold": {
+      "before": {
+        "elapsedMs": {
+          "median": 155.2,
+          "range": [
+            146.15,
+            156.22
+          ]
+        },
+        "cpuMs": {
+          "median": 15,
+          "range": [
+            0,
+            63
+          ]
+        },
+        "maxEventLoopGapMs": {
+          "median": 16.01,
+          "range": [
+            15.58,
+            16.05
+          ]
+        },
+        "heapDeltaBytes": {
+          "median": 77776,
+          "range": [
+            77280,
+            78760
+          ]
+        },
+        "rssBytes": {
+          "median": 68345856,
+          "range": [
+            68218880,
+            69570560
+          ]
+        },
+        "requests": {
+          "median": 9,
+          "range": [
+            9,
+            9
+          ]
+        }
+      },
+      "after": {
+        "elapsedMs": {
+          "median": 93.34,
+          "range": [
+            92.66,
+            99.4
+          ]
+        },
+        "cpuMs": {
+          "median": 16,
+          "range": [
+            0,
+            47
+          ]
+        },
+        "maxEventLoopGapMs": {
+          "median": 15.62,
+          "range": [
+            15.55,
+            16.19
+          ]
+        },
+        "heapDeltaBytes": {
+          "median": 63360,
+          "range": [
+            61304,
+            63744
+          ]
+        },
+        "rssBytes": {
+          "median": 69148672,
+          "range": [
+            69033984,
+            74031104
+          ]
+        },
+        "requests": {
+          "median": 9,
+          "range": [
+            9,
+            9
+          ]
+        }
+      }
+    },
+    "spotifyDiscoveryWarm": {
+      "before": {
+        "elapsedMs": {
+          "median": 1.96,
+          "range": [
+            1.6,
+            2.34
+          ]
+        },
+        "cpuMs": {
+          "median": 0,
+          "range": [
+            0,
+            0
+          ]
+        },
+        "maxEventLoopGapMs": {
+          "median": 8.96,
+          "range": [
+            8.93,
+            10.06
+          ]
+        },
+        "heapDeltaBytes": {
+          "median": 1360,
+          "range": [
+            1152,
+            1360
+          ]
+        },
+        "rssBytes": {
+          "median": 68378624,
+          "range": [
+            68231168,
+            69660672
+          ]
+        },
+        "requests": {
+          "median": 0,
+          "range": [
+            0,
+            0
+          ]
+        },
+        "discoveredOperations": {
+          "median": 1,
+          "range": [
+            1,
+            1
+          ]
+        }
+      },
+      "after": {
+        "elapsedMs": {
+          "median": 1.68,
+          "range": [
+            1.46,
+            1.99
+          ]
+        },
+        "cpuMs": {
+          "median": 0,
+          "range": [
+            0,
+            0
+          ]
+        },
+        "maxEventLoopGapMs": {
+          "median": 8.95,
+          "range": [
+            0.74,
+            10.3
+          ]
+        },
+        "heapDeltaBytes": {
+          "median": 4344,
+          "range": [
+            4160,
+            209848
+          ]
+        },
+        "rssBytes": {
+          "median": 69210112,
+          "range": [
+            69046272,
+            73564160
+          ]
+        },
+        "requests": {
+          "median": 0,
+          "range": [
+            0,
+            0
+          ]
+        },
+        "discoveredOperations": {
+          "median": 2,
+          "range": [
+            2,
+            2
+          ]
+        }
+      }
+    },
+    "spotifyDuplicateSearch": {
+      "before": {
+        "elapsedMs": {
+          "median": 42.9,
+          "range": [
+            42.48,
+            43.29
+          ]
+        },
+        "cpuMs": {
+          "median": 0,
+          "range": [
+            0,
+            16
+          ]
+        },
+        "maxEventLoopGapMs": {
+          "median": 15.55,
+          "range": [
+            15.48,
+            15.61
+          ]
+        },
+        "heapDeltaBytes": {
+          "median": 45752,
+          "range": [
+            45656,
+            45752
+          ]
+        },
+        "rssBytes": {
+          "median": 68411392,
+          "range": [
+            68251648,
+            69734400
+          ]
+        },
+        "searchRequests": {
+          "median": 16,
+          "range": [
+            16,
+            16
+          ]
+        },
+        "tokenRequests": {
+          "median": 16,
+          "range": [
+            16,
+            16
+          ]
+        },
+        "resultCount": {
+          "median": 1,
+          "range": [
+            1,
+            1
+          ]
+        }
+      },
+      "after": {
+        "elapsedMs": {
+          "median": 43.58,
+          "range": [
+            43.35,
+            43.68
+          ]
+        },
+        "cpuMs": {
+          "median": 0,
+          "range": [
+            0,
+            16
+          ]
+        },
+        "maxEventLoopGapMs": {
+          "median": 15.56,
+          "range": [
+            15.55,
+            15.6
+          ]
+        },
+        "heapDeltaBytes": {
+          "median": 67296,
+          "range": [
+            61800,
+            68264
+          ]
+        },
+        "rssBytes": {
+          "median": 69476352,
+          "range": [
+            69324800,
+            73818112
+          ]
+        },
+        "searchRequests": {
+          "median": 1,
+          "range": [
+            1,
+            1
+          ]
+        },
+        "tokenRequests": {
+          "median": 1,
+          "range": [
+            1,
+            1
+          ]
+        },
+        "resultCount": {
+          "median": 1,
+          "range": [
+            1,
+            1
+          ]
+        }
+      }
+    },
+    "soundcloudDuplicateSearch": {
+      "before": {
+        "elapsedMs": {
+          "median": 27.74,
+          "range": [
+            27.51,
+            28
+          ]
+        },
+        "cpuMs": {
+          "median": 15,
+          "range": [
+            0,
+            15
+          ]
+        },
+        "maxEventLoopGapMs": {
+          "median": 15.6,
+          "range": [
+            15.57,
+            16.09
+          ]
+        },
+        "heapDeltaBytes": {
+          "median": 56480,
+          "range": [
+            56480,
+            57120
+          ]
+        },
+        "rssBytes": {
+          "median": 68489216,
+          "range": [
+            68079616,
+            69840896
+          ]
+        },
+        "searchRequests": {
+          "median": 16,
+          "range": [
+            16,
+            16
+          ]
+        },
+        "tokenRequests": {
+          "median": 0,
+          "range": [
+            0,
+            0
+          ]
+        },
+        "resultCount": {
+          "median": 1,
+          "range": [
+            1,
+            1
+          ]
+        }
+      },
+      "after": {
+        "elapsedMs": {
+          "median": 27.92,
+          "range": [
+            27.5,
+            28.49
+          ]
+        },
+        "cpuMs": {
+          "median": 0,
+          "range": [
+            0,
+            0
+          ]
+        },
+        "maxEventLoopGapMs": {
+          "median": 15.56,
+          "range": [
+            15.52,
+            15.6
+          ]
+        },
+        "heapDeltaBytes": {
+          "median": 24016,
+          "range": [
+            24016,
+            24016
+          ]
+        },
+        "rssBytes": {
+          "median": 69484544,
+          "range": [
+            69373952,
+            73863168
+          ]
+        },
+        "searchRequests": {
+          "median": 1,
+          "range": [
+            1,
+            1
+          ]
+        },
+        "tokenRequests": {
+          "median": 0,
+          "range": [
+            0,
+            0
+          ]
+        },
+        "resultCount": {
+          "median": 1,
+          "range": [
+            1,
+            1
+          ]
+        }
+      }
+    },
+    "youtubeDuplicateSearch": {
+      "before": {
+        "elapsedMs": {
+          "median": 26.95,
+          "range": [
+            26.54,
+            27.42
+          ]
+        },
+        "cpuMs": {
+          "median": 0,
+          "range": [
+            0,
+            0
+          ]
+        },
+        "maxEventLoopGapMs": {
+          "median": 15.55,
+          "range": [
+            15.5,
+            16.03
+          ]
+        },
+        "heapDeltaBytes": {
+          "median": 22832,
+          "range": [
+            22832,
+            23024
+          ]
+        },
+        "rssBytes": {
+          "median": 68567040,
+          "range": [
+            68165632,
+            69914624
+          ]
+        },
+        "searchRequests": {
+          "median": 16,
+          "range": [
+            16,
+            16
+          ]
+        },
+        "tokenRequests": {
+          "median": 0,
+          "range": [
+            0,
+            0
+          ]
+        },
+        "resultCount": {
+          "median": 1,
+          "range": [
+            1,
+            1
+          ]
+        }
+      },
+      "after": {
+        "elapsedMs": {
+          "median": 27.42,
+          "range": [
+            27.25,
+            27.6
+          ]
+        },
+        "cpuMs": {
+          "median": 0,
+          "range": [
+            0,
+            0
+          ]
+        },
+        "maxEventLoopGapMs": {
+          "median": 15.54,
+          "range": [
+            15.53,
+            15.56
+          ]
+        },
+        "heapDeltaBytes": {
+          "median": 19296,
+          "range": [
+            19296,
+            19808
+          ]
+        },
+        "rssBytes": {
+          "median": 69595136,
+          "range": [
+            69386240,
+            73928704
+          ]
+        },
+        "searchRequests": {
+          "median": 1,
+          "range": [
+            1,
+            1
+          ]
+        },
+        "tokenRequests": {
+          "median": 0,
+          "range": [
+            0,
+            0
+          ]
+        },
+        "resultCount": {
+          "median": 1,
+          "range": [
+            1,
+            1
+          ]
+        }
+      }
+    },
+    "memoryOnlyCache": {
+      "before": {
+        "elapsedMs": {
+          "median": 4.98,
+          "range": [
+            4.05,
+            5.37
+          ]
+        },
+        "cpuMs": {
+          "median": 0,
+          "range": [
+            0,
+            16
+          ]
+        },
+        "maxEventLoopGapMs": {
+          "median": 7.05,
+          "range": [
+            6.16,
+            7.49
+          ]
+        },
+        "heapDeltaBytes": {
+          "median": 160616,
+          "range": [
+            160520,
+            160712
+          ]
+        },
+        "rssBytes": {
+          "median": 68829184,
+          "range": [
+            68382720,
+            70135808
+          ]
+        },
+        "persistedBytes": {
+          "median": 2,
+          "range": [
+            2,
+            2
+          ]
+        },
+        "entries": {
+          "median": 400,
+          "range": [
+            400,
+            400
+          ]
+        }
+      },
+      "after": {
+        "elapsedMs": {
+          "median": 2.13,
+          "range": [
+            1.93,
+            2.16
+          ]
+        },
+        "cpuMs": {
+          "median": 0,
+          "range": [
+            0,
+            0
+          ]
+        },
+        "maxEventLoopGapMs": {
+          "median": 9.43,
+          "range": [
+            9.41,
+            10.07
+          ]
+        },
+        "heapDeltaBytes": {
+          "median": 192264,
+          "range": [
+            192264,
+            192312
+          ]
+        },
+        "rssBytes": {
+          "median": 69365760,
+          "range": [
+            69251072,
+            73912320
+          ]
+        },
+        "persistedBytes": {
+          "median": 0,
+          "range": [
+            0,
+            0
+          ]
+        },
+        "entries": {
+          "median": 400,
+          "range": [
+            400,
+            400
+          ]
+        }
+      }
+    },
+    "cacheHydration": {
+      "before": {
+        "elapsedMs": {
+          "median": 33.81,
+          "range": [
+            29.28,
+            36.69
+          ]
+        },
+        "cpuMs": {
+          "median": 31,
+          "range": [
+            31,
+            31
+          ]
+        },
+        "maxEventLoopGapMs": {
+          "median": 20.71,
+          "range": [
+            18.32,
+            22.51
+          ]
+        },
+        "heapDeltaBytes": {
+          "median": 19665384,
+          "range": [
+            19664856,
+            19665544
+          ]
+        },
+        "rssBytes": {
+          "median": 131334144,
+          "range": [
+            129728512,
+            133885952
+          ]
+        },
+        "fileBytes": {
+          "median": 19402891,
+          "range": [
+            19402891,
+            19402891
+          ]
+        },
+        "entries": {
+          "median": 2400,
+          "range": [
+            2400,
+            2400
+          ]
+        }
+      },
+      "after": {
+        "elapsedMs": {
+          "median": 109.98,
+          "range": [
+            101.51,
+            138.97
+          ]
+        },
+        "cpuMs": {
+          "median": 125,
+          "range": [
+            110,
+            157
+          ]
+        },
+        "maxEventLoopGapMs": {
+          "median": 15.58,
+          "range": [
+            15.56,
+            15.92
+          ]
+        },
+        "heapDeltaBytes": {
+          "median": 3345512,
+          "range": [
+            3345512,
+            3345696
+          ]
+        },
+        "rssBytes": {
+          "median": 150908928,
+          "range": [
+            150454272,
+            155574272
+          ]
+        },
+        "fileBytes": {
+          "median": 19402891,
+          "range": [
+            19402891,
+            19402891
+          ]
+        },
+        "entries": {
+          "median": 389,
+          "range": [
+            389,
+            389
+          ]
+        }
+      }
+    },
+    "cacheGrowth": {
+      "before": {
+        "elapsedMs": {
+          "median": 68.38,
+          "range": [
+            56.6,
+            71.22
+          ]
+        },
+        "cpuMs": {
+          "median": 63,
+          "range": [
+            62,
+            126
+          ]
+        },
+        "maxEventLoopGapMs": {
+          "median": 56.5,
+          "range": [
+            48.28,
+            61.47
+          ]
+        },
+        "heapDeltaBytes": {
+          "median": 18779616,
+          "range": [
+            18779616,
+            18780144
+          ]
+        },
+        "rssBytes": {
+          "median": 178712576,
+          "range": [
+            177229824,
+            181387264
+          ]
+        },
+        "entries": {
+          "median": 580,
+          "range": [
+            580,
+            580
+          ]
+        },
+        "persistedBytes": {
+          "median": 18641782,
+          "range": [
+            18641782,
+            18641782
+          ]
+        }
+      },
+      "after": {
+        "elapsedMs": {
+          "median": 18.36,
+          "range": [
+            17.7,
+            19.14
+          ]
+        },
+        "cpuMs": {
+          "median": 15,
+          "range": [
+            15,
+            31
+          ]
+        },
+        "maxEventLoopGapMs": {
+          "median": 16.01,
+          "range": [
+            14.37,
+            16.2
+          ]
+        },
+        "heapDeltaBytes": {
+          "median": 3648920,
+          "range": [
+            3647400,
+            3650920
+          ]
+        },
+        "rssBytes": {
+          "median": 164331520,
+          "range": [
+            163971072,
+            166555648
+          ]
+        },
+        "entries": {
+          "median": 110,
+          "range": [
+            110,
+            110
+          ]
+        },
+        "persistedBytes": {
+          "median": 3530781,
+          "range": [
+            3530781,
+            3530781
+          ]
+        }
+      }
+    },
+    "localScanCold": {
+      "before": {
+        "elapsedMs": {
+          "median": 260.23,
+          "range": [
+            196.11,
+            272.23
+          ]
+        },
+        "cpuMs": {
+          "median": 281,
+          "range": [
+            249,
+            297
+          ]
+        },
+        "maxEventLoopGapMs": {
+          "median": 127.02,
+          "range": [
+            95.86,
+            140.41
+          ]
+        },
+        "heapDeltaBytes": {
+          "median": 2261992,
+          "range": [
+            2261528,
+            2262616
+          ]
+        },
+        "rssBytes": {
+          "median": 185991168,
+          "range": [
+            184958976,
+            187719680
+          ]
+        },
+        "tracks": {
+          "median": 120,
+          "range": [
+            120,
+            120
+          ]
+        }
+      },
+      "after": {
+        "elapsedMs": {
+          "median": 229.42,
+          "range": [
+            227.53,
+            248.62
+          ]
+        },
+        "cpuMs": {
+          "median": 266,
+          "range": [
+            234,
+            329
+          ]
+        },
+        "maxEventLoopGapMs": {
+          "median": 15.57,
+          "range": [
+            15.54,
+            16.09
+          ]
+        },
+        "heapDeltaBytes": {
+          "median": 287728,
+          "range": [
+            287728,
+            288240
+          ]
+        },
+        "rssBytes": {
+          "median": 166031360,
+          "range": [
+            165568512,
+            167657472
+          ]
+        },
+        "tracks": {
+          "median": 120,
+          "range": [
+            120,
+            120
+          ]
+        }
+      }
+    },
+    "localScanWarm": {
+      "before": {
+        "elapsedMs": {
+          "median": 68.73,
+          "range": [
+            63.2,
+            82.32
+          ]
+        },
+        "cpuMs": {
+          "median": 79,
+          "range": [
+            47,
+            125
+          ]
+        },
+        "maxEventLoopGapMs": {
+          "median": 3.81,
+          "range": [
+            2.81,
+            8.25
+          ]
+        },
+        "heapDeltaBytes": {
+          "median": 28952,
+          "range": [
+            28448,
+            30416
+          ]
+        },
+        "rssBytes": {
+          "median": 186048512,
+          "range": [
+            185835520,
+            188407808
+          ]
+        },
+        "tracks": {
+          "median": 120,
+          "range": [
+            120,
+            120
+          ]
+        }
+      },
+      "after": {
+        "elapsedMs": {
+          "median": 18.68,
+          "range": [
+            18.39,
+            23.13
+          ]
+        },
+        "cpuMs": {
+          "median": 16,
+          "range": [
+            16,
+            77
+          ]
+        },
+        "maxEventLoopGapMs": {
+          "median": 7.6,
+          "range": [
+            1.96,
+            8.42
+          ]
+        },
+        "heapDeltaBytes": {
+          "median": 23096,
+          "range": [
+            23096,
+            23280
+          ]
+        },
+        "rssBytes": {
+          "median": 166109184,
+          "range": [
+            165584896,
+            167723008
+          ]
+        },
+        "tracks": {
+          "median": 120,
+          "range": [
+            120,
+            120
+          ]
+        }
+      }
+    },
+    "localScanConcurrent": {
+      "before": {
+        "elapsedMs": {
+          "median": 39202.1,
+          "range": [
+            326.03,
+            68366.89
+          ]
+        },
+        "cpuMs": {
+          "median": 63672,
+          "range": [
+            578,
+            114812
+          ]
+        },
+        "maxEventLoopGapMs": {
+          "median": 10.3,
+          "range": [
+            7.36,
+            15.19
+          ]
+        },
+        "heapDeltaBytes": {
+          "median": 384552,
+          "range": [
+            -4040504,
+            685560
+          ]
+        },
+        "rssBytes": {
+          "median": 276779008,
+          "range": [
+            262959104,
+            280428544
+          ]
+        }
+      },
+      "after": {
+        "elapsedMs": {
+          "median": 19.53,
+          "range": [
+            19.17,
+            21.78
+          ]
+        },
+        "cpuMs": {
+          "median": 16,
+          "range": [
+            15,
+            16
+          ]
+        },
+        "maxEventLoopGapMs": {
+          "median": 7.47,
+          "range": [
+            4.39,
+            7.69
+          ]
+        },
+        "heapDeltaBytes": {
+          "median": 17520,
+          "range": [
+            13040,
+            17520
+          ]
+        },
+        "rssBytes": {
+          "median": 166232064,
+          "range": [
+            165732352,
+            167854080
+          ]
+        }
+      }
+    }
+  },
+  "desktopSummary": {
+    "before": {
+      "rendererReadyMs": {
+        "median": 541.5999999940395,
+        "range": [
+          532.0999999940395,
+          813.4000000059605
+        ]
+      },
+      "hostReadyMs": {
+        "median": 710.57,
+        "range": [
+          696.37,
+          1997.61
+        ]
+      },
+      "firstResultMs": {
+        "median": 155.09999999403954,
+        "range": [
+          154.5,
+          155.39999997615814
+        ]
+      },
+      "completeResultMs": {
+        "median": 155.09999999403954,
+        "range": [
+          154.5,
+          155.39999997615814
+        ]
+      },
+      "medianMenuCommitMs": {
+        "median": 15.599999994039536,
+        "range": [
+          15.5,
+          15.699999988079071
+        ]
+      },
+      "p95MenuCommitMs": {
+        "median": 22.399999976158142,
+        "range": [
+          16.80000001192093,
+          7625.800000011921
+        ]
+      },
+      "medianFrameMs": {
+        "median": 16.699999999999818,
+        "range": [
+          16.69999999999891,
+          16.699999999999818
+        ]
+      },
+      "p95FrameMs": {
+        "median": 16.799999999999727,
+        "range": [
+          16.700000000000728,
+          33.30000000000109
+        ]
+      },
+      "maxFrameMs": {
+        "median": 50.100000000000364,
+        "range": [
+          50.09999999999991,
+          7609.80000000596
+        ]
+      },
+      "rendererWorkingSetKiB": {
+        "median": 134988,
+        "range": [
+          133924,
+          141260
+        ]
+      },
+      "rendererPrivateKiB": {
+        "median": 73824,
+        "range": [
+          72652,
+          81408
+        ]
+      },
+      "gpuWorkingSetKiB": {
+        "median": 169384,
+        "range": [
+          168892,
+          171808
+        ]
+      },
+      "gpuPrivateKiB": {
+        "median": 395052,
+        "range": [
+          389244,
+          395684
+        ]
+      },
+      "mainCpuDuringMenuMs": {
+        "median": 515,
+        "range": [
+          469,
+          797
+        ]
+      }
+    },
+    "after-opaque": {
+      "rendererReadyMs": {
+        "median": 128.30000001192093,
+        "range": [
+          120.2000000178814,
+          135.40000000596046
+        ]
+      },
+      "hostReadyMs": {
+        "median": 289.08,
+        "range": [
+          270.73,
+          353.67
+        ]
+      },
+      "firstResultMs": {
+        "median": 46.400000005960464,
+        "range": [
+          39.70000001788139,
+          46.599999994039536
+        ]
+      },
+      "completeResultMs": {
+        "median": 155.5,
+        "range": [
+          155,
+          164
+        ]
+      },
+      "medianMenuCommitMs": {
+        "median": 15.700000017881393,
+        "range": [
+          15.300000011920929,
+          15.799999982118607
+        ]
+      },
+      "p95MenuCommitMs": {
+        "median": 22.69999998807907,
+        "range": [
+          18.700000017881393,
+          23
+        ]
+      },
+      "medianFrameMs": {
+        "median": 16.699999999999818,
+        "range": [
+          16.699999999999818,
+          16.699999999999818
+        ]
+      },
+      "p95FrameMs": {
+        "median": 16.700000000000273,
+        "range": [
+          16.700000000000273,
+          16.799999999999727
+        ]
+      },
+      "maxFrameMs": {
+        "median": 33.299999999999955,
+        "range": [
+          33.299999999999955,
+          33.40000000000009
+        ]
+      },
+      "rendererWorkingSetKiB": {
+        "median": 130592,
+        "range": [
+          128680,
+          134968
+        ]
+      },
+      "rendererPrivateKiB": {
+        "median": 70528,
+        "range": [
+          67120,
+          74952
+        ]
+      },
+      "gpuWorkingSetKiB": {
+        "median": 163972,
+        "range": [
+          162300,
+          167796
+        ]
+      },
+      "gpuPrivateKiB": {
+        "median": 407892,
+        "range": [
+          405020,
+          407996
+        ]
+      },
+      "mainCpuDuringMenuMs": {
+        "median": 454,
+        "range": [
+          407,
+          641
+        ]
+      }
+    },
+    "after-glass": {
+      "rendererReadyMs": {
+        "median": 132,
+        "range": [
+          122.5,
+          135.90000000596046
+        ]
+      },
+      "hostReadyMs": {
+        "median": 314.61,
+        "range": [
+          286.92,
+          329.94
+        ]
+      },
+      "firstResultMs": {
+        "median": 46.70000001788139,
+        "range": [
+          46.29999998211861,
+          47.099999994039536
+        ]
+      },
+      "completeResultMs": {
+        "median": 155.30000001192093,
+        "range": [
+          155,
+          155.5
+        ]
+      },
+      "medianMenuCommitMs": {
+        "median": 16.19999998807907,
+        "range": [
+          15.599999994039536,
+          16.400000005960464
+        ]
+      },
+      "p95MenuCommitMs": {
+        "median": 18.69999998807907,
+        "range": [
+          18.19999998807907,
+          21.80000001192093
+        ]
+      },
+      "medianFrameMs": {
+        "median": 16.699999999999818,
+        "range": [
+          16.699999999999818,
+          16.699999999999818
+        ]
+      },
+      "p95FrameMs": {
+        "median": 16.700000000000273,
+        "range": [
+          16.700000000000273,
+          16.799999999999727
+        ]
+      },
+      "maxFrameMs": {
+        "median": 33.30000000000018,
+        "range": [
+          33.200000000000045,
+          33.40000000000009
+        ]
+      },
+      "rendererWorkingSetKiB": {
+        "median": 132420,
+        "range": [
+          132108,
+          133332
+        ]
+      },
+      "rendererPrivateKiB": {
+        "median": 72124,
+        "range": [
+          70900,
+          72624
+        ]
+      },
+      "gpuWorkingSetKiB": {
+        "median": 166904,
+        "range": [
+          163880,
+          170888
+        ]
+      },
+      "gpuPrivateKiB": {
+        "median": 405356,
+        "range": [
+          396840,
+          405464
+        ]
+      },
+      "mainCpuDuringMenuMs": {
+        "median": 390,
+        "range": [
+          359,
+          484
+        ]
+      }
+    }
+  },
+  "raw": {
+    "backend": {
+      "before": [
+        {
+          "node": "v24.18.0",
+          "fixtureNetworkLatencyMs": 15,
+          "samples": {
+            "spotifyDiscoveryCold": {
+              "elapsedMs": 146.15,
+              "cpuMs": 15,
+              "maxEventLoopGapMs": 16.01,
+              "heapDeltaBytes": 78760,
+              "rssBytes": 68218880,
+              "requests": 9,
+              "ready": true
+            },
+            "spotifyDiscoveryWarm": {
+              "elapsedMs": 2.34,
+              "cpuMs": 0,
+              "maxEventLoopGapMs": 8.96,
+              "heapDeltaBytes": 1152,
+              "rssBytes": 68231168,
+              "requests": 0,
+              "discoveredOperations": 1
+            },
+            "spotifyDuplicateSearch": {
+              "elapsedMs": 42.48,
+              "cpuMs": 0,
+              "maxEventLoopGapMs": 15.61,
+              "heapDeltaBytes": 45656,
+              "rssBytes": 68251648,
+              "searchRequests": 16,
+              "tokenRequests": 16,
+              "allSucceeded": true,
+              "warmSource": "cache",
+              "resultCount": 1
+            },
+            "soundcloudDuplicateSearch": {
+              "elapsedMs": 27.51,
+              "cpuMs": 0,
+              "maxEventLoopGapMs": 15.57,
+              "heapDeltaBytes": 57120,
+              "rssBytes": 68489216,
+              "searchRequests": 16,
+              "tokenRequests": 0,
+              "allSucceeded": true,
+              "warmSource": "cache",
+              "resultCount": 1
+            },
+            "youtubeDuplicateSearch": {
+              "elapsedMs": 27.42,
+              "cpuMs": 0,
+              "maxEventLoopGapMs": 16.03,
+              "heapDeltaBytes": 23024,
+              "rssBytes": 68567040,
+              "searchRequests": 16,
+              "tokenRequests": 0,
+              "allSucceeded": true,
+              "warmSource": "cache",
+              "resultCount": 1
+            },
+            "memoryOnlyCache": {
+              "elapsedMs": 4.98,
+              "cpuMs": 0,
+              "maxEventLoopGapMs": 7.05,
+              "heapDeltaBytes": 160712,
+              "rssBytes": 68382720,
+              "persistedBytes": 2,
+              "entries": 400
+            },
+            "cacheHydration": {
+              "elapsedMs": 33.81,
+              "cpuMs": 31,
+              "maxEventLoopGapMs": 20.71,
+              "heapDeltaBytes": 19665384,
+              "rssBytes": 129728512,
+              "fileBytes": 19402891,
+              "entries": 2400
+            },
+            "cacheGrowth": {
+              "elapsedMs": 71.22,
+              "cpuMs": 126,
+              "maxEventLoopGapMs": 61.47,
+              "heapDeltaBytes": 18779616,
+              "rssBytes": 178712576,
+              "entries": 580,
+              "persistedBytes": 18641782
+            },
+            "localScanCold": {
+              "elapsedMs": 272.23,
+              "cpuMs": 281,
+              "maxEventLoopGapMs": 140.41,
+              "heapDeltaBytes": 2261992,
+              "rssBytes": 184958976,
+              "tracks": 120
+            },
+            "localScanWarm": {
+              "elapsedMs": 68.73,
+              "cpuMs": 79,
+              "maxEventLoopGapMs": 2.81,
+              "heapDeltaBytes": 28952,
+              "rssBytes": 185835520,
+              "tracks": 120
+            },
+            "localScanConcurrent": {
+              "elapsedMs": 68366.89,
+              "cpuMs": 114812,
+              "maxEventLoopGapMs": 7.36,
+              "heapDeltaBytes": -4040504,
+              "rssBytes": 276779008,
+              "counts": [
+                120,
+                120,
+                120
+              ]
+            }
+          }
+        },
+        {
+          "node": "v24.18.0",
+          "fixtureNetworkLatencyMs": 15,
+          "samples": {
+            "spotifyDiscoveryCold": {
+              "elapsedMs": 155.2,
+              "cpuMs": 0,
+              "maxEventLoopGapMs": 15.58,
+              "heapDeltaBytes": 77776,
+              "rssBytes": 69570560,
+              "requests": 9,
+              "ready": true
+            },
+            "spotifyDiscoveryWarm": {
+              "elapsedMs": 1.6,
+              "cpuMs": 0,
+              "maxEventLoopGapMs": 10.06,
+              "heapDeltaBytes": 1360,
+              "rssBytes": 69660672,
+              "requests": 0,
+              "discoveredOperations": 1
+            },
+            "spotifyDuplicateSearch": {
+              "elapsedMs": 43.29,
+              "cpuMs": 0,
+              "maxEventLoopGapMs": 15.48,
+              "heapDeltaBytes": 45752,
+              "rssBytes": 69734400,
+              "searchRequests": 16,
+              "tokenRequests": 16,
+              "allSucceeded": true,
+              "warmSource": "cache",
+              "resultCount": 1
+            },
+            "soundcloudDuplicateSearch": {
+              "elapsedMs": 28,
+              "cpuMs": 15,
+              "maxEventLoopGapMs": 16.09,
+              "heapDeltaBytes": 56480,
+              "rssBytes": 69840896,
+              "searchRequests": 16,
+              "tokenRequests": 0,
+              "allSucceeded": true,
+              "warmSource": "cache",
+              "resultCount": 1
+            },
+            "youtubeDuplicateSearch": {
+              "elapsedMs": 26.54,
+              "cpuMs": 0,
+              "maxEventLoopGapMs": 15.5,
+              "heapDeltaBytes": 22832,
+              "rssBytes": 69914624,
+              "searchRequests": 16,
+              "tokenRequests": 0,
+              "allSucceeded": true,
+              "warmSource": "cache",
+              "resultCount": 1
+            },
+            "memoryOnlyCache": {
+              "elapsedMs": 4.05,
+              "cpuMs": 16,
+              "maxEventLoopGapMs": 7.49,
+              "heapDeltaBytes": 160520,
+              "rssBytes": 70135808,
+              "persistedBytes": 2,
+              "entries": 400
+            },
+            "cacheHydration": {
+              "elapsedMs": 29.28,
+              "cpuMs": 31,
+              "maxEventLoopGapMs": 18.32,
+              "heapDeltaBytes": 19665544,
+              "rssBytes": 131334144,
+              "fileBytes": 19402891,
+              "entries": 2400
+            },
+            "cacheGrowth": {
+              "elapsedMs": 56.6,
+              "cpuMs": 62,
+              "maxEventLoopGapMs": 48.28,
+              "heapDeltaBytes": 18779616,
+              "rssBytes": 177229824,
+              "entries": 580,
+              "persistedBytes": 18641782
+            },
+            "localScanCold": {
+              "elapsedMs": 196.11,
+              "cpuMs": 249,
+              "maxEventLoopGapMs": 95.86,
+              "heapDeltaBytes": 2262616,
+              "rssBytes": 185991168,
+              "tracks": 120
+            },
+            "localScanWarm": {
+              "elapsedMs": 63.2,
+              "cpuMs": 47,
+              "maxEventLoopGapMs": 8.25,
+              "heapDeltaBytes": 28448,
+              "rssBytes": 186048512,
+              "tracks": 120
+            },
+            "localScanConcurrent": {
+              "elapsedMs": 326.03,
+              "cpuMs": 578,
+              "maxEventLoopGapMs": 10.3,
+              "heapDeltaBytes": 384552,
+              "rssBytes": 262959104,
+              "counts": [
+                120,
+                120,
+                120
+              ]
+            }
+          }
+        },
+        {
+          "node": "v24.18.0",
+          "fixtureNetworkLatencyMs": 15,
+          "samples": {
+            "spotifyDiscoveryCold": {
+              "elapsedMs": 156.22,
+              "cpuMs": 63,
+              "maxEventLoopGapMs": 16.05,
+              "heapDeltaBytes": 77280,
+              "rssBytes": 68345856,
+              "requests": 9,
+              "ready": true
+            },
+            "spotifyDiscoveryWarm": {
+              "elapsedMs": 1.96,
+              "cpuMs": 0,
+              "maxEventLoopGapMs": 8.93,
+              "heapDeltaBytes": 1360,
+              "rssBytes": 68378624,
+              "requests": 0,
+              "discoveredOperations": 1
+            },
+            "spotifyDuplicateSearch": {
+              "elapsedMs": 42.9,
+              "cpuMs": 16,
+              "maxEventLoopGapMs": 15.55,
+              "heapDeltaBytes": 45752,
+              "rssBytes": 68411392,
+              "searchRequests": 16,
+              "tokenRequests": 16,
+              "allSucceeded": true,
+              "warmSource": "cache",
+              "resultCount": 1
+            },
+            "soundcloudDuplicateSearch": {
+              "elapsedMs": 27.74,
+              "cpuMs": 15,
+              "maxEventLoopGapMs": 15.6,
+              "heapDeltaBytes": 56480,
+              "rssBytes": 68079616,
+              "searchRequests": 16,
+              "tokenRequests": 0,
+              "allSucceeded": true,
+              "warmSource": "cache",
+              "resultCount": 1
+            },
+            "youtubeDuplicateSearch": {
+              "elapsedMs": 26.95,
+              "cpuMs": 0,
+              "maxEventLoopGapMs": 15.55,
+              "heapDeltaBytes": 22832,
+              "rssBytes": 68165632,
+              "searchRequests": 16,
+              "tokenRequests": 0,
+              "allSucceeded": true,
+              "warmSource": "cache",
+              "resultCount": 1
+            },
+            "memoryOnlyCache": {
+              "elapsedMs": 5.37,
+              "cpuMs": 0,
+              "maxEventLoopGapMs": 6.16,
+              "heapDeltaBytes": 160616,
+              "rssBytes": 68829184,
+              "persistedBytes": 2,
+              "entries": 400
+            },
+            "cacheHydration": {
+              "elapsedMs": 36.69,
+              "cpuMs": 31,
+              "maxEventLoopGapMs": 22.51,
+              "heapDeltaBytes": 19664856,
+              "rssBytes": 133885952,
+              "fileBytes": 19402891,
+              "entries": 2400
+            },
+            "cacheGrowth": {
+              "elapsedMs": 68.38,
+              "cpuMs": 63,
+              "maxEventLoopGapMs": 56.5,
+              "heapDeltaBytes": 18780144,
+              "rssBytes": 181387264,
+              "entries": 580,
+              "persistedBytes": 18641782
+            },
+            "localScanCold": {
+              "elapsedMs": 260.23,
+              "cpuMs": 297,
+              "maxEventLoopGapMs": 127.02,
+              "heapDeltaBytes": 2261528,
+              "rssBytes": 187719680,
+              "tracks": 120
+            },
+            "localScanWarm": {
+              "elapsedMs": 82.32,
+              "cpuMs": 125,
+              "maxEventLoopGapMs": 3.81,
+              "heapDeltaBytes": 30416,
+              "rssBytes": 188407808,
+              "tracks": 120
+            },
+            "localScanConcurrent": {
+              "elapsedMs": 39202.1,
+              "cpuMs": 63672,
+              "maxEventLoopGapMs": 15.19,
+              "heapDeltaBytes": 685560,
+              "rssBytes": 280428544,
+              "counts": [
+                120,
+                120,
+                120
+              ]
+            }
+          }
+        }
+      ],
+      "after": [
+        {
+          "node": "v24.18.0",
+          "fixtureNetworkLatencyMs": 15,
+          "samples": {
+            "spotifyDiscoveryCold": {
+              "elapsedMs": 99.4,
+              "cpuMs": 16,
+              "maxEventLoopGapMs": 16.19,
+              "heapDeltaBytes": 63360,
+              "rssBytes": 69148672,
+              "requests": 9,
+              "ready": true
+            },
+            "spotifyDiscoveryWarm": {
+              "elapsedMs": 1.46,
+              "cpuMs": 0,
+              "maxEventLoopGapMs": 0.74,
+              "heapDeltaBytes": 4344,
+              "rssBytes": 69210112,
+              "requests": 0,
+              "discoveredOperations": 2
+            },
+            "spotifyDuplicateSearch": {
+              "elapsedMs": 43.58,
+              "cpuMs": 0,
+              "maxEventLoopGapMs": 15.55,
+              "heapDeltaBytes": 67296,
+              "rssBytes": 69476352,
+              "searchRequests": 1,
+              "tokenRequests": 1,
+              "allSucceeded": true,
+              "warmSource": "cache",
+              "resultCount": 1
+            },
+            "soundcloudDuplicateSearch": {
+              "elapsedMs": 28.49,
+              "cpuMs": 0,
+              "maxEventLoopGapMs": 15.52,
+              "heapDeltaBytes": 24016,
+              "rssBytes": 69484544,
+              "searchRequests": 1,
+              "tokenRequests": 0,
+              "allSucceeded": true,
+              "warmSource": "cache",
+              "resultCount": 1
+            },
+            "youtubeDuplicateSearch": {
+              "elapsedMs": 27.42,
+              "cpuMs": 0,
+              "maxEventLoopGapMs": 15.53,
+              "heapDeltaBytes": 19296,
+              "rssBytes": 69595136,
+              "searchRequests": 1,
+              "tokenRequests": 0,
+              "allSucceeded": true,
+              "warmSource": "cache",
+              "resultCount": 1
+            },
+            "memoryOnlyCache": {
+              "elapsedMs": 1.93,
+              "cpuMs": 0,
+              "maxEventLoopGapMs": 9.43,
+              "heapDeltaBytes": 192312,
+              "rssBytes": 69251072,
+              "persistedBytes": 0,
+              "entries": 400
+            },
+            "cacheHydration": {
+              "elapsedMs": 138.97,
+              "cpuMs": 157,
+              "maxEventLoopGapMs": 15.58,
+              "heapDeltaBytes": 3345696,
+              "rssBytes": 150908928,
+              "fileBytes": 19402891,
+              "entries": 389
+            },
+            "cacheGrowth": {
+              "elapsedMs": 17.7,
+              "cpuMs": 15,
+              "maxEventLoopGapMs": 14.37,
+              "heapDeltaBytes": 3647400,
+              "rssBytes": 164331520,
+              "entries": 110,
+              "persistedBytes": 3530781
+            },
+            "localScanCold": {
+              "elapsedMs": 227.53,
+              "cpuMs": 266,
+              "maxEventLoopGapMs": 16.09,
+              "heapDeltaBytes": 287728,
+              "rssBytes": 166031360,
+              "tracks": 120
+            },
+            "localScanWarm": {
+              "elapsedMs": 18.68,
+              "cpuMs": 16,
+              "maxEventLoopGapMs": 7.6,
+              "heapDeltaBytes": 23096,
+              "rssBytes": 166109184,
+              "tracks": 120
+            },
+            "localScanConcurrent": {
+              "elapsedMs": 19.53,
+              "cpuMs": 15,
+              "maxEventLoopGapMs": 7.69,
+              "heapDeltaBytes": 17520,
+              "rssBytes": 166232064,
+              "counts": [
+                120,
+                120,
+                120
+              ]
+            }
+          }
+        },
+        {
+          "node": "v24.18.0",
+          "fixtureNetworkLatencyMs": 15,
+          "samples": {
+            "spotifyDiscoveryCold": {
+              "elapsedMs": 92.66,
+              "cpuMs": 0,
+              "maxEventLoopGapMs": 15.62,
+              "heapDeltaBytes": 63744,
+              "rssBytes": 69033984,
+              "requests": 9,
+              "ready": true
+            },
+            "spotifyDiscoveryWarm": {
+              "elapsedMs": 1.68,
+              "cpuMs": 0,
+              "maxEventLoopGapMs": 10.3,
+              "heapDeltaBytes": 4160,
+              "rssBytes": 69046272,
+              "requests": 0,
+              "discoveredOperations": 2
+            },
+            "spotifyDuplicateSearch": {
+              "elapsedMs": 43.68,
+              "cpuMs": 0,
+              "maxEventLoopGapMs": 15.6,
+              "heapDeltaBytes": 68264,
+              "rssBytes": 69324800,
+              "searchRequests": 1,
+              "tokenRequests": 1,
+              "allSucceeded": true,
+              "warmSource": "cache",
+              "resultCount": 1
+            },
+            "soundcloudDuplicateSearch": {
+              "elapsedMs": 27.5,
+              "cpuMs": 0,
+              "maxEventLoopGapMs": 15.6,
+              "heapDeltaBytes": 24016,
+              "rssBytes": 69373952,
+              "searchRequests": 1,
+              "tokenRequests": 0,
+              "allSucceeded": true,
+              "warmSource": "cache",
+              "resultCount": 1
+            },
+            "youtubeDuplicateSearch": {
+              "elapsedMs": 27.25,
+              "cpuMs": 0,
+              "maxEventLoopGapMs": 15.54,
+              "heapDeltaBytes": 19808,
+              "rssBytes": 69386240,
+              "searchRequests": 1,
+              "tokenRequests": 0,
+              "allSucceeded": true,
+              "warmSource": "cache",
+              "resultCount": 1
+            },
+            "memoryOnlyCache": {
+              "elapsedMs": 2.13,
+              "cpuMs": 0,
+              "maxEventLoopGapMs": 9.41,
+              "heapDeltaBytes": 192264,
+              "rssBytes": 69365760,
+              "persistedBytes": 0,
+              "entries": 400
+            },
+            "cacheHydration": {
+              "elapsedMs": 109.98,
+              "cpuMs": 110,
+              "maxEventLoopGapMs": 15.92,
+              "heapDeltaBytes": 3345512,
+              "rssBytes": 150454272,
+              "fileBytes": 19402891,
+              "entries": 389
+            },
+            "cacheGrowth": {
+              "elapsedMs": 19.14,
+              "cpuMs": 31,
+              "maxEventLoopGapMs": 16.2,
+              "heapDeltaBytes": 3648920,
+              "rssBytes": 163971072,
+              "entries": 110,
+              "persistedBytes": 3530781
+            },
+            "localScanCold": {
+              "elapsedMs": 248.62,
+              "cpuMs": 329,
+              "maxEventLoopGapMs": 15.57,
+              "heapDeltaBytes": 287728,
+              "rssBytes": 165568512,
+              "tracks": 120
+            },
+            "localScanWarm": {
+              "elapsedMs": 23.13,
+              "cpuMs": 77,
+              "maxEventLoopGapMs": 1.96,
+              "heapDeltaBytes": 23280,
+              "rssBytes": 165584896,
+              "tracks": 120
+            },
+            "localScanConcurrent": {
+              "elapsedMs": 21.78,
+              "cpuMs": 16,
+              "maxEventLoopGapMs": 4.39,
+              "heapDeltaBytes": 13040,
+              "rssBytes": 165732352,
+              "counts": [
+                120,
+                120,
+                120
+              ]
+            }
+          }
+        },
+        {
+          "node": "v24.18.0",
+          "fixtureNetworkLatencyMs": 15,
+          "samples": {
+            "spotifyDiscoveryCold": {
+              "elapsedMs": 93.34,
+              "cpuMs": 47,
+              "maxEventLoopGapMs": 15.55,
+              "heapDeltaBytes": 61304,
+              "rssBytes": 74031104,
+              "requests": 9,
+              "ready": true
+            },
+            "spotifyDiscoveryWarm": {
+              "elapsedMs": 1.99,
+              "cpuMs": 0,
+              "maxEventLoopGapMs": 8.95,
+              "heapDeltaBytes": 209848,
+              "rssBytes": 73564160,
+              "requests": 0,
+              "discoveredOperations": 2
+            },
+            "spotifyDuplicateSearch": {
+              "elapsedMs": 43.35,
+              "cpuMs": 16,
+              "maxEventLoopGapMs": 15.56,
+              "heapDeltaBytes": 61800,
+              "rssBytes": 73818112,
+              "searchRequests": 1,
+              "tokenRequests": 1,
+              "allSucceeded": true,
+              "warmSource": "cache",
+              "resultCount": 1
+            },
+            "soundcloudDuplicateSearch": {
+              "elapsedMs": 27.92,
+              "cpuMs": 0,
+              "maxEventLoopGapMs": 15.56,
+              "heapDeltaBytes": 24016,
+              "rssBytes": 73863168,
+              "searchRequests": 1,
+              "tokenRequests": 0,
+              "allSucceeded": true,
+              "warmSource": "cache",
+              "resultCount": 1
+            },
+            "youtubeDuplicateSearch": {
+              "elapsedMs": 27.6,
+              "cpuMs": 0,
+              "maxEventLoopGapMs": 15.56,
+              "heapDeltaBytes": 19296,
+              "rssBytes": 73928704,
+              "searchRequests": 1,
+              "tokenRequests": 0,
+              "allSucceeded": true,
+              "warmSource": "cache",
+              "resultCount": 1
+            },
+            "memoryOnlyCache": {
+              "elapsedMs": 2.16,
+              "cpuMs": 0,
+              "maxEventLoopGapMs": 10.07,
+              "heapDeltaBytes": 192264,
+              "rssBytes": 73912320,
+              "persistedBytes": 0,
+              "entries": 400
+            },
+            "cacheHydration": {
+              "elapsedMs": 101.51,
+              "cpuMs": 125,
+              "maxEventLoopGapMs": 15.56,
+              "heapDeltaBytes": 3345512,
+              "rssBytes": 155574272,
+              "fileBytes": 19402891,
+              "entries": 389
+            },
+            "cacheGrowth": {
+              "elapsedMs": 18.36,
+              "cpuMs": 15,
+              "maxEventLoopGapMs": 16.01,
+              "heapDeltaBytes": 3650920,
+              "rssBytes": 166555648,
+              "entries": 110,
+              "persistedBytes": 3530781
+            },
+            "localScanCold": {
+              "elapsedMs": 229.42,
+              "cpuMs": 234,
+              "maxEventLoopGapMs": 15.54,
+              "heapDeltaBytes": 288240,
+              "rssBytes": 167657472,
+              "tracks": 120
+            },
+            "localScanWarm": {
+              "elapsedMs": 18.39,
+              "cpuMs": 16,
+              "maxEventLoopGapMs": 8.42,
+              "heapDeltaBytes": 23096,
+              "rssBytes": 167723008,
+              "tracks": 120
+            },
+            "localScanConcurrent": {
+              "elapsedMs": 19.17,
+              "cpuMs": 16,
+              "maxEventLoopGapMs": 7.47,
+              "heapDeltaBytes": 17520,
+              "rssBytes": 167854080,
+              "counts": [
+                120,
+                120,
+                120
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "desktop": {
+      "before": [
+        {
+          "versions": {
+            "node": "24.18.0",
+            "acorn": "8.16.0",
+            "ada": "3.4.4",
+            "amaro": "1.1.9",
+            "ares": "1.34.6",
+            "brotli": "1.0.9",
+            "cldr": "47.0",
+            "icu": "77.1",
+            "llhttp": "9.4.2",
+            "merve": "1.2.2",
+            "modules": "145",
+            "napi": "10",
+            "nbytes": "0.1.4",
+            "ncrypto": "0.0.1",
+            "nghttp2": "1.69.0",
+            "nghttp3": "",
+            "ngtcp2": "",
+            "openssl": "0.0.0",
+            "simdjson": "4.6.4",
+            "simdutf": "7.7.0",
+            "sqlite": "3.53.1",
+            "tz": "2025b",
+            "undici": "7.28.0",
+            "unicode": "16.0",
+            "uv": "1.52.1",
+            "uvwasi": "0.0.23",
+            "v8": "14.6.202.34-electron.0",
+            "zlib": "1.3.1",
+            "zstd": "1.6.0",
+            "electron": "41.10.7",
+            "chrome": "146.0.7680.216"
+          },
+          "os": "10.0.26200",
+          "materialRequested": "opaque",
+          "nativeMaterial": "opaque",
+          "loadedMs": 1039.62,
+          "startup": {
+            "rendererReadyMs": 813.4000000059605,
+            "syncingAtReady": false,
+            "cachedTracksAtReady": 120,
+            "hostReadyMs": 1997.61
+          },
+          "searches": {
+            "firstResultMs": 154.5,
+            "finalMs": 154.5,
+            "order": [
+              "spotify:search-probe-0",
+              "spotify:search-probe-1",
+              "spotify:search-probe-2",
+              "spotify:search-probe-3",
+              "spotify:search-probe-4",
+              "spotify:search-probe-5",
+              "spotify:search-probe-6",
+              "spotify:search-probe-7",
+              "spotify:search-probe-8",
+              "spotify:search-probe-9",
+              "spotify:search-probe-10",
+              "spotify:search-probe-11",
+              "spotify:search-probe-12",
+              "spotify:search-probe-13",
+              "spotify:search-probe-14",
+              "spotify:search-probe-15",
+              "spotify:search-probe-16",
+              "spotify:search-probe-17",
+              "soundcloud:search-probe-0",
+              "soundcloud:search-probe-1",
+              "soundcloud:search-probe-2",
+              "soundcloud:search-probe-3",
+              "soundcloud:search-probe-4",
+              "soundcloud:search-probe-5",
+              "youtube:search-probe-0",
+              "youtube:search-probe-1",
+              "youtube:search-probe-2",
+              "youtube:search-probe-3",
+              "youtube:search-probe-4",
+              "youtube:search-probe-5"
+            ],
+            "duplicateFetches": 8,
+            "staleResultsDiscarded": true,
+            "fetchAborts": 0,
+            "fetchCalls": 11
+          },
+          "menus": {
+            "frames": 130,
+            "medianFrameMs": 16.69999999999891,
+            "p95FrameMs": 33.30000000000109,
+            "maxFrameMs": 7609.80000000596,
+            "framesOver33Ms": 5,
+            "approximateMedianFps": 59.880239520962,
+            "medianMenuCommitMs": 15.5,
+            "p95MenuCommitMs": 7625.800000011921
+          },
+          "mainCpuDuringMenuMs": 797,
+          "rendererMemoryKiB": {
+            "workingSetSize": 141260,
+            "peakWorkingSetSize": 141316,
+            "privateBytes": 81408
+          },
+          "processMetrics": [
+            {
+              "type": "Browser",
+              "cpu": 0,
+              "workingSetKiB": 164272,
+              "privateKiB": 136100
+            },
+            {
+              "type": "GPU",
+              "cpu": 0,
+              "workingSetKiB": 171808,
+              "privateKiB": 389244
+            },
+            {
+              "type": "Utility",
+              "cpu": 0,
+              "workingSetKiB": 56948,
+              "privateKiB": 12272
+            },
+            {
+              "type": "Tab",
+              "cpu": 0,
+              "workingSetKiB": 141260,
+              "privateKiB": 81408
+            }
+          ],
+          "visual": {
+            "material": "baseline",
+            "bodyBackground": "rgb(12, 12, 13)",
+            "idleBeatWillChange": "opacity, transform",
+            "cssBlurLayers": 0,
+            "viewport": {
+              "width": 1280,
+              "height": 860
+            },
+            "horizontalOverflow": false
+          },
+          "counters": {
+            "gatewaySearches": 13,
+            "gatewayAborts": 0,
+            "startupSignals": 1,
+            "blockedExternalRequests": 0
+          },
+          "errors": [],
+          "limitations": [
+            "Synthetic data, blocked external requests, fresh disposable profile; no accounts or playback.",
+            "Offscreen BrowserWindow rendering capped at 60 fps; comparable renderer frame timing excludes foreground DWM smoothness and native backdrop GPU cost.",
+            "Secure AMP startup/CDM initialization, installed-binary behavior, provider-network latency, and subscription playback excluded.",
+            "capturePage returns app pixels without the external desktop backdrop."
+          ]
+        },
+        {
+          "versions": {
+            "node": "24.18.0",
+            "acorn": "8.16.0",
+            "ada": "3.4.4",
+            "amaro": "1.1.9",
+            "ares": "1.34.6",
+            "brotli": "1.0.9",
+            "cldr": "47.0",
+            "icu": "77.1",
+            "llhttp": "9.4.2",
+            "merve": "1.2.2",
+            "modules": "145",
+            "napi": "10",
+            "nbytes": "0.1.4",
+            "ncrypto": "0.0.1",
+            "nghttp2": "1.69.0",
+            "nghttp3": "",
+            "ngtcp2": "",
+            "openssl": "0.0.0",
+            "simdjson": "4.6.4",
+            "simdutf": "7.7.0",
+            "sqlite": "3.53.1",
+            "tz": "2025b",
+            "undici": "7.28.0",
+            "unicode": "16.0",
+            "uv": "1.52.1",
+            "uvwasi": "0.0.23",
+            "v8": "14.6.202.34-electron.0",
+            "zlib": "1.3.1",
+            "zstd": "1.6.0",
+            "electron": "41.10.7",
+            "chrome": "146.0.7680.216"
+          },
+          "os": "10.0.26200",
+          "materialRequested": "opaque",
+          "nativeMaterial": "opaque",
+          "loadedMs": 170.67,
+          "startup": {
+            "rendererReadyMs": 532.0999999940395,
+            "syncingAtReady": false,
+            "cachedTracksAtReady": 120,
+            "hostReadyMs": 696.37
+          },
+          "searches": {
+            "firstResultMs": 155.09999999403954,
+            "finalMs": 155.09999999403954,
+            "order": [
+              "spotify:search-probe-0",
+              "spotify:search-probe-1",
+              "spotify:search-probe-2",
+              "spotify:search-probe-3",
+              "spotify:search-probe-4",
+              "spotify:search-probe-5",
+              "spotify:search-probe-6",
+              "spotify:search-probe-7",
+              "spotify:search-probe-8",
+              "spotify:search-probe-9",
+              "spotify:search-probe-10",
+              "spotify:search-probe-11",
+              "spotify:search-probe-12",
+              "spotify:search-probe-13",
+              "spotify:search-probe-14",
+              "spotify:search-probe-15",
+              "spotify:search-probe-16",
+              "spotify:search-probe-17",
+              "soundcloud:search-probe-0",
+              "soundcloud:search-probe-1",
+              "soundcloud:search-probe-2",
+              "soundcloud:search-probe-3",
+              "soundcloud:search-probe-4",
+              "soundcloud:search-probe-5",
+              "youtube:search-probe-0",
+              "youtube:search-probe-1",
+              "youtube:search-probe-2",
+              "youtube:search-probe-3",
+              "youtube:search-probe-4",
+              "youtube:search-probe-5"
+            ],
+            "duplicateFetches": 8,
+            "staleResultsDiscarded": true,
+            "fetchAborts": 0,
+            "fetchCalls": 11
+          },
+          "menus": {
+            "frames": 151,
+            "medianFrameMs": 16.699999999999818,
+            "p95FrameMs": 16.799999999999727,
+            "maxFrameMs": 50.100000000000364,
+            "framesOver33Ms": 1,
+            "approximateMedianFps": 59.88023952095874,
+            "medianMenuCommitMs": 15.599999994039536,
+            "p95MenuCommitMs": 22.399999976158142
+          },
+          "mainCpuDuringMenuMs": 515,
+          "rendererMemoryKiB": {
+            "workingSetSize": 133924,
+            "peakWorkingSetSize": 133924,
+            "privateBytes": 73824
+          },
+          "processMetrics": [
+            {
+              "type": "Browser",
+              "cpu": 0,
+              "workingSetKiB": 119656,
+              "privateKiB": 91532
+            },
+            {
+              "type": "GPU",
+              "cpu": 0,
+              "workingSetKiB": 169384,
+              "privateKiB": 395684
+            },
+            {
+              "type": "Utility",
+              "cpu": 0,
+              "workingSetKiB": 54296,
+              "privateKiB": 12288
+            },
+            {
+              "type": "Tab",
+              "cpu": 0,
+              "workingSetKiB": 133924,
+              "privateKiB": 73824
+            }
+          ],
+          "visual": {
+            "material": "baseline",
+            "bodyBackground": "rgb(12, 12, 13)",
+            "idleBeatWillChange": "opacity, transform",
+            "cssBlurLayers": 0,
+            "viewport": {
+              "width": 1280,
+              "height": 860
+            },
+            "horizontalOverflow": false
+          },
+          "counters": {
+            "gatewaySearches": 11,
+            "gatewayAborts": 0,
+            "startupSignals": 1,
+            "blockedExternalRequests": 0
+          },
+          "errors": [],
+          "limitations": [
+            "Synthetic data, blocked external requests, fresh disposable profile; no accounts or playback.",
+            "Offscreen BrowserWindow rendering capped at 60 fps; comparable renderer frame timing excludes foreground DWM smoothness and native backdrop GPU cost.",
+            "Secure AMP startup/CDM initialization, installed-binary behavior, provider-network latency, and subscription playback excluded.",
+            "capturePage returns app pixels without the external desktop backdrop."
+          ]
+        },
+        {
+          "versions": {
+            "node": "24.18.0",
+            "acorn": "8.16.0",
+            "ada": "3.4.4",
+            "amaro": "1.1.9",
+            "ares": "1.34.6",
+            "brotli": "1.0.9",
+            "cldr": "47.0",
+            "icu": "77.1",
+            "llhttp": "9.4.2",
+            "merve": "1.2.2",
+            "modules": "145",
+            "napi": "10",
+            "nbytes": "0.1.4",
+            "ncrypto": "0.0.1",
+            "nghttp2": "1.69.0",
+            "nghttp3": "",
+            "ngtcp2": "",
+            "openssl": "0.0.0",
+            "simdjson": "4.6.4",
+            "simdutf": "7.7.0",
+            "sqlite": "3.53.1",
+            "tz": "2025b",
+            "undici": "7.28.0",
+            "unicode": "16.0",
+            "uv": "1.52.1",
+            "uvwasi": "0.0.23",
+            "v8": "14.6.202.34-electron.0",
+            "zlib": "1.3.1",
+            "zstd": "1.6.0",
+            "electron": "41.10.7",
+            "chrome": "146.0.7680.216"
+          },
+          "os": "10.0.26200",
+          "materialRequested": "opaque",
+          "nativeMaterial": "opaque",
+          "loadedMs": 176.04,
+          "startup": {
+            "rendererReadyMs": 541.5999999940395,
+            "syncingAtReady": false,
+            "cachedTracksAtReady": 120,
+            "hostReadyMs": 710.57
+          },
+          "searches": {
+            "firstResultMs": 155.39999997615814,
+            "finalMs": 155.39999997615814,
+            "order": [
+              "spotify:search-probe-0",
+              "spotify:search-probe-1",
+              "spotify:search-probe-2",
+              "spotify:search-probe-3",
+              "spotify:search-probe-4",
+              "spotify:search-probe-5",
+              "spotify:search-probe-6",
+              "spotify:search-probe-7",
+              "spotify:search-probe-8",
+              "spotify:search-probe-9",
+              "spotify:search-probe-10",
+              "spotify:search-probe-11",
+              "spotify:search-probe-12",
+              "spotify:search-probe-13",
+              "spotify:search-probe-14",
+              "spotify:search-probe-15",
+              "spotify:search-probe-16",
+              "spotify:search-probe-17",
+              "soundcloud:search-probe-0",
+              "soundcloud:search-probe-1",
+              "soundcloud:search-probe-2",
+              "soundcloud:search-probe-3",
+              "soundcloud:search-probe-4",
+              "soundcloud:search-probe-5",
+              "youtube:search-probe-0",
+              "youtube:search-probe-1",
+              "youtube:search-probe-2",
+              "youtube:search-probe-3",
+              "youtube:search-probe-4",
+              "youtube:search-probe-5"
+            ],
+            "duplicateFetches": 8,
+            "staleResultsDiscarded": true,
+            "fetchAborts": 0,
+            "fetchCalls": 11
+          },
+          "menus": {
+            "frames": 149,
+            "medianFrameMs": 16.699999999999818,
+            "p95FrameMs": 16.700000000000728,
+            "maxFrameMs": 50.09999999999991,
+            "framesOver33Ms": 1,
+            "approximateMedianFps": 59.88023952095874,
+            "medianMenuCommitMs": 15.699999988079071,
+            "p95MenuCommitMs": 16.80000001192093
+          },
+          "mainCpuDuringMenuMs": 469,
+          "rendererMemoryKiB": {
+            "workingSetSize": 134988,
+            "peakWorkingSetSize": 134988,
+            "privateBytes": 72652
+          },
+          "processMetrics": [
+            {
+              "type": "Browser",
+              "cpu": 0,
+              "workingSetKiB": 118388,
+              "privateKiB": 89452
+            },
+            {
+              "type": "GPU",
+              "cpu": 0,
+              "workingSetKiB": 168892,
+              "privateKiB": 395052
+            },
+            {
+              "type": "Utility",
+              "cpu": 0,
+              "workingSetKiB": 54224,
+              "privateKiB": 12416
+            },
+            {
+              "type": "Tab",
+              "cpu": 0,
+              "workingSetKiB": 134988,
+              "privateKiB": 72652
+            }
+          ],
+          "visual": {
+            "material": "baseline",
+            "bodyBackground": "rgb(12, 12, 13)",
+            "idleBeatWillChange": "opacity, transform",
+            "cssBlurLayers": 0,
+            "viewport": {
+              "width": 1280,
+              "height": 860
+            },
+            "horizontalOverflow": false
+          },
+          "counters": {
+            "gatewaySearches": 11,
+            "gatewayAborts": 0,
+            "startupSignals": 1,
+            "blockedExternalRequests": 0
+          },
+          "errors": [],
+          "limitations": [
+            "Synthetic data, blocked external requests, fresh disposable profile; no accounts or playback.",
+            "Offscreen BrowserWindow rendering capped at 60 fps; comparable renderer frame timing excludes foreground DWM smoothness and native backdrop GPU cost.",
+            "Secure AMP startup/CDM initialization, installed-binary behavior, provider-network latency, and subscription playback excluded.",
+            "capturePage returns app pixels without the external desktop backdrop."
+          ]
+        }
+      ],
+      "after-opaque": [
+        {
+          "versions": {
+            "node": "24.18.0",
+            "acorn": "8.16.0",
+            "ada": "3.4.4",
+            "amaro": "1.1.9",
+            "ares": "1.34.6",
+            "brotli": "1.0.9",
+            "cldr": "47.0",
+            "icu": "77.1",
+            "llhttp": "9.4.2",
+            "merve": "1.2.2",
+            "modules": "145",
+            "napi": "10",
+            "nbytes": "0.1.4",
+            "ncrypto": "0.0.1",
+            "nghttp2": "1.69.0",
+            "nghttp3": "",
+            "ngtcp2": "",
+            "openssl": "0.0.0",
+            "simdjson": "4.6.4",
+            "simdutf": "7.7.0",
+            "sqlite": "3.53.1",
+            "tz": "2025b",
+            "undici": "7.28.0",
+            "unicode": "16.0",
+            "uv": "1.52.1",
+            "uvwasi": "0.0.23",
+            "v8": "14.6.202.34-electron.0",
+            "zlib": "1.3.1",
+            "zstd": "1.6.0",
+            "electron": "41.10.7",
+            "chrome": "146.0.7680.216"
+          },
+          "os": "10.0.26200",
+          "materialRequested": "opaque",
+          "nativeMaterial": "opaque",
+          "loadedMs": 168.2,
+          "startup": {
+            "rendererReadyMs": 128.30000001192093,
+            "syncingAtReady": true,
+            "cachedTracksAtReady": 120,
+            "hostReadyMs": 289.08
+          },
+          "searches": {
+            "firstResultMs": 39.70000001788139,
+            "finalMs": 164,
+            "order": [
+              "spotify:search-probe-0",
+              "spotify:search-probe-1",
+              "spotify:search-probe-2",
+              "spotify:search-probe-3",
+              "spotify:search-probe-4",
+              "spotify:search-probe-5",
+              "spotify:search-probe-6",
+              "spotify:search-probe-7",
+              "spotify:search-probe-8",
+              "spotify:search-probe-9",
+              "spotify:search-probe-10",
+              "spotify:search-probe-11",
+              "spotify:search-probe-12",
+              "spotify:search-probe-13",
+              "spotify:search-probe-14",
+              "spotify:search-probe-15",
+              "spotify:search-probe-16",
+              "spotify:search-probe-17",
+              "soundcloud:search-probe-0",
+              "soundcloud:search-probe-1",
+              "soundcloud:search-probe-2",
+              "soundcloud:search-probe-3",
+              "soundcloud:search-probe-4",
+              "soundcloud:search-probe-5",
+              "youtube:search-probe-0",
+              "youtube:search-probe-1",
+              "youtube:search-probe-2",
+              "youtube:search-probe-3",
+              "youtube:search-probe-4",
+              "youtube:search-probe-5"
+            ],
+            "duplicateFetches": 1,
+            "staleResultsDiscarded": true,
+            "fetchAborts": 1,
+            "fetchCalls": 4
+          },
+          "menus": {
+            "frames": 151,
+            "medianFrameMs": 16.699999999999818,
+            "p95FrameMs": 16.700000000000273,
+            "maxFrameMs": 33.299999999999955,
+            "framesOver33Ms": 0,
+            "approximateMedianFps": 59.88023952095874,
+            "medianMenuCommitMs": 15.799999982118607,
+            "p95MenuCommitMs": 23
+          },
+          "mainCpuDuringMenuMs": 454,
+          "rendererMemoryKiB": {
+            "workingSetSize": 130592,
+            "peakWorkingSetSize": 130692,
+            "privateBytes": 70528
+          },
+          "processMetrics": [
+            {
+              "type": "Browser",
+              "cpu": 0,
+              "workingSetKiB": 119176,
+              "privateKiB": 89884
+            },
+            {
+              "type": "GPU",
+              "cpu": 0,
+              "workingSetKiB": 167796,
+              "privateKiB": 405020
+            },
+            {
+              "type": "Utility",
+              "cpu": 0,
+              "workingSetKiB": 54164,
+              "privateKiB": 12384
+            },
+            {
+              "type": "Tab",
+              "cpu": 0,
+              "workingSetKiB": 130592,
+              "privateKiB": 70528
+            }
+          ],
+          "visual": {
+            "material": "opaque",
+            "bodyBackground": "rgb(16, 16, 18)",
+            "idleBeatWillChange": "auto",
+            "cssBlurLayers": 0,
+            "viewport": {
+              "width": 1280,
+              "height": 860
+            },
+            "horizontalOverflow": false
+          },
+          "counters": {
+            "gatewaySearches": 11,
+            "gatewayAborts": 2,
+            "startupSignals": 1,
+            "blockedExternalRequests": 0
+          },
+          "errors": [],
+          "limitations": [
+            "Synthetic data, blocked external requests, fresh disposable profile; no accounts or playback.",
+            "Offscreen BrowserWindow rendering capped at 60 fps; comparable renderer frame timing excludes foreground DWM smoothness and native backdrop GPU cost.",
+            "Secure AMP startup/CDM initialization, installed-binary behavior, provider-network latency, and subscription playback excluded.",
+            "capturePage returns app pixels without the external desktop backdrop."
+          ]
+        },
+        {
+          "versions": {
+            "node": "24.18.0",
+            "acorn": "8.16.0",
+            "ada": "3.4.4",
+            "amaro": "1.1.9",
+            "ares": "1.34.6",
+            "brotli": "1.0.9",
+            "cldr": "47.0",
+            "icu": "77.1",
+            "llhttp": "9.4.2",
+            "merve": "1.2.2",
+            "modules": "145",
+            "napi": "10",
+            "nbytes": "0.1.4",
+            "ncrypto": "0.0.1",
+            "nghttp2": "1.69.0",
+            "nghttp3": "",
+            "ngtcp2": "",
+            "openssl": "0.0.0",
+            "simdjson": "4.6.4",
+            "simdutf": "7.7.0",
+            "sqlite": "3.53.1",
+            "tz": "2025b",
+            "undici": "7.28.0",
+            "unicode": "16.0",
+            "uv": "1.52.1",
+            "uvwasi": "0.0.23",
+            "v8": "14.6.202.34-electron.0",
+            "zlib": "1.3.1",
+            "zstd": "1.6.0",
+            "electron": "41.10.7",
+            "chrome": "146.0.7680.216"
+          },
+          "os": "10.0.26200",
+          "materialRequested": "opaque",
+          "nativeMaterial": "opaque",
+          "loadedMs": 157.58,
+          "startup": {
+            "rendererReadyMs": 120.2000000178814,
+            "syncingAtReady": true,
+            "cachedTracksAtReady": 120,
+            "hostReadyMs": 270.73
+          },
+          "searches": {
+            "firstResultMs": 46.599999994039536,
+            "finalMs": 155,
+            "order": [
+              "spotify:search-probe-0",
+              "spotify:search-probe-1",
+              "spotify:search-probe-2",
+              "spotify:search-probe-3",
+              "spotify:search-probe-4",
+              "spotify:search-probe-5",
+              "spotify:search-probe-6",
+              "spotify:search-probe-7",
+              "spotify:search-probe-8",
+              "spotify:search-probe-9",
+              "spotify:search-probe-10",
+              "spotify:search-probe-11",
+              "spotify:search-probe-12",
+              "spotify:search-probe-13",
+              "spotify:search-probe-14",
+              "spotify:search-probe-15",
+              "spotify:search-probe-16",
+              "spotify:search-probe-17",
+              "soundcloud:search-probe-0",
+              "soundcloud:search-probe-1",
+              "soundcloud:search-probe-2",
+              "soundcloud:search-probe-3",
+              "soundcloud:search-probe-4",
+              "soundcloud:search-probe-5",
+              "youtube:search-probe-0",
+              "youtube:search-probe-1",
+              "youtube:search-probe-2",
+              "youtube:search-probe-3",
+              "youtube:search-probe-4",
+              "youtube:search-probe-5"
+            ],
+            "duplicateFetches": 1,
+            "staleResultsDiscarded": true,
+            "fetchAborts": 1,
+            "fetchCalls": 4
+          },
+          "menus": {
+            "frames": 152,
+            "medianFrameMs": 16.699999999999818,
+            "p95FrameMs": 16.700000000000273,
+            "maxFrameMs": 33.40000000000009,
+            "framesOver33Ms": 1,
+            "approximateMedianFps": 59.88023952095874,
+            "medianMenuCommitMs": 15.300000011920929,
+            "p95MenuCommitMs": 22.69999998807907
+          },
+          "mainCpuDuringMenuMs": 641,
+          "rendererMemoryKiB": {
+            "workingSetSize": 128680,
+            "peakWorkingSetSize": 128680,
+            "privateBytes": 67120
+          },
+          "processMetrics": [
+            {
+              "type": "Browser",
+              "cpu": 0,
+              "workingSetKiB": 114728,
+              "privateKiB": 85308
+            },
+            {
+              "type": "GPU",
+              "cpu": 0,
+              "workingSetKiB": 163972,
+              "privateKiB": 407892
+            },
+            {
+              "type": "Utility",
+              "cpu": 0,
+              "workingSetKiB": 54356,
+              "privateKiB": 12384
+            },
+            {
+              "type": "Tab",
+              "cpu": 0,
+              "workingSetKiB": 128680,
+              "privateKiB": 67120
+            }
+          ],
+          "visual": {
+            "material": "opaque",
+            "bodyBackground": "rgb(16, 16, 18)",
+            "idleBeatWillChange": "auto",
+            "cssBlurLayers": 0,
+            "viewport": {
+              "width": 1280,
+              "height": 860
+            },
+            "horizontalOverflow": false
+          },
+          "counters": {
+            "gatewaySearches": 11,
+            "gatewayAborts": 2,
+            "startupSignals": 1,
+            "blockedExternalRequests": 0
+          },
+          "errors": [],
+          "limitations": [
+            "Synthetic data, blocked external requests, fresh disposable profile; no accounts or playback.",
+            "Offscreen BrowserWindow rendering capped at 60 fps; comparable renderer frame timing excludes foreground DWM smoothness and native backdrop GPU cost.",
+            "Secure AMP startup/CDM initialization, installed-binary behavior, provider-network latency, and subscription playback excluded.",
+            "capturePage returns app pixels without the external desktop backdrop."
+          ]
+        },
+        {
+          "versions": {
+            "node": "24.18.0",
+            "acorn": "8.16.0",
+            "ada": "3.4.4",
+            "amaro": "1.1.9",
+            "ares": "1.34.6",
+            "brotli": "1.0.9",
+            "cldr": "47.0",
+            "icu": "77.1",
+            "llhttp": "9.4.2",
+            "merve": "1.2.2",
+            "modules": "145",
+            "napi": "10",
+            "nbytes": "0.1.4",
+            "ncrypto": "0.0.1",
+            "nghttp2": "1.69.0",
+            "nghttp3": "",
+            "ngtcp2": "",
+            "openssl": "0.0.0",
+            "simdjson": "4.6.4",
+            "simdutf": "7.7.0",
+            "sqlite": "3.53.1",
+            "tz": "2025b",
+            "undici": "7.28.0",
+            "unicode": "16.0",
+            "uv": "1.52.1",
+            "uvwasi": "0.0.23",
+            "v8": "14.6.202.34-electron.0",
+            "zlib": "1.3.1",
+            "zstd": "1.6.0",
+            "electron": "41.10.7",
+            "chrome": "146.0.7680.216"
+          },
+          "os": "10.0.26200",
+          "materialRequested": "opaque",
+          "nativeMaterial": "opaque",
+          "loadedMs": 226.35,
+          "startup": {
+            "rendererReadyMs": 135.40000000596046,
+            "syncingAtReady": true,
+            "cachedTracksAtReady": 120,
+            "hostReadyMs": 353.67
+          },
+          "searches": {
+            "firstResultMs": 46.400000005960464,
+            "finalMs": 155.5,
+            "order": [
+              "spotify:search-probe-0",
+              "spotify:search-probe-1",
+              "spotify:search-probe-2",
+              "spotify:search-probe-3",
+              "spotify:search-probe-4",
+              "spotify:search-probe-5",
+              "spotify:search-probe-6",
+              "spotify:search-probe-7",
+              "spotify:search-probe-8",
+              "spotify:search-probe-9",
+              "spotify:search-probe-10",
+              "spotify:search-probe-11",
+              "spotify:search-probe-12",
+              "spotify:search-probe-13",
+              "spotify:search-probe-14",
+              "spotify:search-probe-15",
+              "spotify:search-probe-16",
+              "spotify:search-probe-17",
+              "soundcloud:search-probe-0",
+              "soundcloud:search-probe-1",
+              "soundcloud:search-probe-2",
+              "soundcloud:search-probe-3",
+              "soundcloud:search-probe-4",
+              "soundcloud:search-probe-5",
+              "youtube:search-probe-0",
+              "youtube:search-probe-1",
+              "youtube:search-probe-2",
+              "youtube:search-probe-3",
+              "youtube:search-probe-4",
+              "youtube:search-probe-5"
+            ],
+            "duplicateFetches": 1,
+            "staleResultsDiscarded": true,
+            "fetchAborts": 1,
+            "fetchCalls": 4
+          },
+          "menus": {
+            "frames": 151,
+            "medianFrameMs": 16.699999999999818,
+            "p95FrameMs": 16.799999999999727,
+            "maxFrameMs": 33.299999999999955,
+            "framesOver33Ms": 0,
+            "approximateMedianFps": 59.88023952095874,
+            "medianMenuCommitMs": 15.700000017881393,
+            "p95MenuCommitMs": 18.700000017881393
+          },
+          "mainCpuDuringMenuMs": 407,
+          "rendererMemoryKiB": {
+            "workingSetSize": 134968,
+            "peakWorkingSetSize": 134968,
+            "privateBytes": 74952
+          },
+          "processMetrics": [
+            {
+              "type": "Browser",
+              "cpu": 0,
+              "workingSetKiB": 128032,
+              "privateKiB": 98840
+            },
+            {
+              "type": "GPU",
+              "cpu": 0,
+              "workingSetKiB": 162300,
+              "privateKiB": 407996
+            },
+            {
+              "type": "Utility",
+              "cpu": 0,
+              "workingSetKiB": 54368,
+              "privateKiB": 12364
+            },
+            {
+              "type": "Tab",
+              "cpu": 0,
+              "workingSetKiB": 134968,
+              "privateKiB": 74952
+            }
+          ],
+          "visual": {
+            "material": "opaque",
+            "bodyBackground": "rgb(16, 16, 18)",
+            "idleBeatWillChange": "auto",
+            "cssBlurLayers": 0,
+            "viewport": {
+              "width": 1280,
+              "height": 860
+            },
+            "horizontalOverflow": false
+          },
+          "counters": {
+            "gatewaySearches": 11,
+            "gatewayAborts": 2,
+            "startupSignals": 1,
+            "blockedExternalRequests": 0
+          },
+          "errors": [],
+          "limitations": [
+            "Synthetic data, blocked external requests, fresh disposable profile; no accounts or playback.",
+            "Offscreen BrowserWindow rendering capped at 60 fps; comparable renderer frame timing excludes foreground DWM smoothness and native backdrop GPU cost.",
+            "Secure AMP startup/CDM initialization, installed-binary behavior, provider-network latency, and subscription playback excluded.",
+            "capturePage returns app pixels without the external desktop backdrop."
+          ]
+        }
+      ],
+      "after-glass": [
+        {
+          "versions": {
+            "node": "24.18.0",
+            "acorn": "8.16.0",
+            "ada": "3.4.4",
+            "amaro": "1.1.9",
+            "ares": "1.34.6",
+            "brotli": "1.0.9",
+            "cldr": "47.0",
+            "icu": "77.1",
+            "llhttp": "9.4.2",
+            "merve": "1.2.2",
+            "modules": "145",
+            "napi": "10",
+            "nbytes": "0.1.4",
+            "ncrypto": "0.0.1",
+            "nghttp2": "1.69.0",
+            "nghttp3": "",
+            "ngtcp2": "",
+            "openssl": "0.0.0",
+            "simdjson": "4.6.4",
+            "simdutf": "7.7.0",
+            "sqlite": "3.53.1",
+            "tz": "2025b",
+            "undici": "7.28.0",
+            "unicode": "16.0",
+            "uv": "1.52.1",
+            "uvwasi": "0.0.23",
+            "v8": "14.6.202.34-electron.0",
+            "zlib": "1.3.1",
+            "zstd": "1.6.0",
+            "electron": "41.10.7",
+            "chrome": "146.0.7680.216"
+          },
+          "os": "10.0.26200",
+          "materialRequested": "glass",
+          "nativeMaterial": "acrylic",
+          "loadedMs": 201.51,
+          "startup": {
+            "rendererReadyMs": 135.90000000596046,
+            "syncingAtReady": true,
+            "cachedTracksAtReady": 120,
+            "hostReadyMs": 329.94
+          },
+          "searches": {
+            "firstResultMs": 46.29999998211861,
+            "finalMs": 155,
+            "order": [
+              "spotify:search-probe-0",
+              "spotify:search-probe-1",
+              "spotify:search-probe-2",
+              "spotify:search-probe-3",
+              "spotify:search-probe-4",
+              "spotify:search-probe-5",
+              "spotify:search-probe-6",
+              "spotify:search-probe-7",
+              "spotify:search-probe-8",
+              "spotify:search-probe-9",
+              "spotify:search-probe-10",
+              "spotify:search-probe-11",
+              "spotify:search-probe-12",
+              "spotify:search-probe-13",
+              "spotify:search-probe-14",
+              "spotify:search-probe-15",
+              "spotify:search-probe-16",
+              "spotify:search-probe-17",
+              "soundcloud:search-probe-0",
+              "soundcloud:search-probe-1",
+              "soundcloud:search-probe-2",
+              "soundcloud:search-probe-3",
+              "soundcloud:search-probe-4",
+              "soundcloud:search-probe-5",
+              "youtube:search-probe-0",
+              "youtube:search-probe-1",
+              "youtube:search-probe-2",
+              "youtube:search-probe-3",
+              "youtube:search-probe-4",
+              "youtube:search-probe-5"
+            ],
+            "duplicateFetches": 1,
+            "staleResultsDiscarded": true,
+            "fetchAborts": 1,
+            "fetchCalls": 4
+          },
+          "menus": {
+            "frames": 151,
+            "medianFrameMs": 16.699999999999818,
+            "p95FrameMs": 16.700000000000273,
+            "maxFrameMs": 33.30000000000018,
+            "framesOver33Ms": 0,
+            "approximateMedianFps": 59.88023952095874,
+            "medianMenuCommitMs": 16.19999998807907,
+            "p95MenuCommitMs": 18.19999998807907
+          },
+          "mainCpuDuringMenuMs": 484,
+          "rendererMemoryKiB": {
+            "workingSetSize": 132420,
+            "peakWorkingSetSize": 132584,
+            "privateBytes": 72624
+          },
+          "processMetrics": [
+            {
+              "type": "Browser",
+              "cpu": 0,
+              "workingSetKiB": 119020,
+              "privateKiB": 89796
+            },
+            {
+              "type": "GPU",
+              "cpu": 0,
+              "workingSetKiB": 170888,
+              "privateKiB": 405356
+            },
+            {
+              "type": "Utility",
+              "cpu": 0,
+              "workingSetKiB": 54272,
+              "privateKiB": 12452
+            },
+            {
+              "type": "Tab",
+              "cpu": 0,
+              "workingSetKiB": 132420,
+              "privateKiB": 72624
+            }
+          ],
+          "visual": {
+            "material": "glass",
+            "bodyBackground": "rgba(10, 10, 12, 0.82)",
+            "idleBeatWillChange": "auto",
+            "cssBlurLayers": 0,
+            "viewport": {
+              "width": 1280,
+              "height": 860
+            },
+            "horizontalOverflow": false
+          },
+          "counters": {
+            "gatewaySearches": 11,
+            "gatewayAborts": 2,
+            "startupSignals": 1,
+            "blockedExternalRequests": 0
+          },
+          "errors": [],
+          "limitations": [
+            "Synthetic data, blocked external requests, fresh disposable profile; no accounts or playback.",
+            "Offscreen BrowserWindow rendering capped at 60 fps; comparable renderer frame timing excludes foreground DWM smoothness and native backdrop GPU cost.",
+            "Secure AMP startup/CDM initialization, installed-binary behavior, provider-network latency, and subscription playback excluded.",
+            "capturePage returns app pixels without the external desktop backdrop."
+          ]
+        },
+        {
+          "versions": {
+            "node": "24.18.0",
+            "acorn": "8.16.0",
+            "ada": "3.4.4",
+            "amaro": "1.1.9",
+            "ares": "1.34.6",
+            "brotli": "1.0.9",
+            "cldr": "47.0",
+            "icu": "77.1",
+            "llhttp": "9.4.2",
+            "merve": "1.2.2",
+            "modules": "145",
+            "napi": "10",
+            "nbytes": "0.1.4",
+            "ncrypto": "0.0.1",
+            "nghttp2": "1.69.0",
+            "nghttp3": "",
+            "ngtcp2": "",
+            "openssl": "0.0.0",
+            "simdjson": "4.6.4",
+            "simdutf": "7.7.0",
+            "sqlite": "3.53.1",
+            "tz": "2025b",
+            "undici": "7.28.0",
+            "unicode": "16.0",
+            "uv": "1.52.1",
+            "uvwasi": "0.0.23",
+            "v8": "14.6.202.34-electron.0",
+            "zlib": "1.3.1",
+            "zstd": "1.6.0",
+            "electron": "41.10.7",
+            "chrome": "146.0.7680.216"
+          },
+          "os": "10.0.26200",
+          "materialRequested": "glass",
+          "nativeMaterial": "acrylic",
+          "loadedMs": 171.33,
+          "startup": {
+            "rendererReadyMs": 122.5,
+            "syncingAtReady": true,
+            "cachedTracksAtReady": 120,
+            "hostReadyMs": 286.92
+          },
+          "searches": {
+            "firstResultMs": 47.099999994039536,
+            "finalMs": 155.5,
+            "order": [
+              "spotify:search-probe-0",
+              "spotify:search-probe-1",
+              "spotify:search-probe-2",
+              "spotify:search-probe-3",
+              "spotify:search-probe-4",
+              "spotify:search-probe-5",
+              "spotify:search-probe-6",
+              "spotify:search-probe-7",
+              "spotify:search-probe-8",
+              "spotify:search-probe-9",
+              "spotify:search-probe-10",
+              "spotify:search-probe-11",
+              "spotify:search-probe-12",
+              "spotify:search-probe-13",
+              "spotify:search-probe-14",
+              "spotify:search-probe-15",
+              "spotify:search-probe-16",
+              "spotify:search-probe-17",
+              "soundcloud:search-probe-0",
+              "soundcloud:search-probe-1",
+              "soundcloud:search-probe-2",
+              "soundcloud:search-probe-3",
+              "soundcloud:search-probe-4",
+              "soundcloud:search-probe-5",
+              "youtube:search-probe-0",
+              "youtube:search-probe-1",
+              "youtube:search-probe-2",
+              "youtube:search-probe-3",
+              "youtube:search-probe-4",
+              "youtube:search-probe-5"
+            ],
+            "duplicateFetches": 1,
+            "staleResultsDiscarded": true,
+            "fetchAborts": 1,
+            "fetchCalls": 4
+          },
+          "menus": {
+            "frames": 152,
+            "medianFrameMs": 16.699999999999818,
+            "p95FrameMs": 16.700000000000273,
+            "maxFrameMs": 33.40000000000009,
+            "framesOver33Ms": 1,
+            "approximateMedianFps": 59.88023952095874,
+            "medianMenuCommitMs": 15.599999994039536,
+            "p95MenuCommitMs": 21.80000001192093
+          },
+          "mainCpuDuringMenuMs": 359,
+          "rendererMemoryKiB": {
+            "workingSetSize": 132108,
+            "peakWorkingSetSize": 132240,
+            "privateBytes": 70900
+          },
+          "processMetrics": [
+            {
+              "type": "Browser",
+              "cpu": 0,
+              "workingSetKiB": 117488,
+              "privateKiB": 88088
+            },
+            {
+              "type": "GPU",
+              "cpu": 0,
+              "workingSetKiB": 163880,
+              "privateKiB": 405464
+            },
+            {
+              "type": "Utility",
+              "cpu": 0,
+              "workingSetKiB": 54052,
+              "privateKiB": 12228
+            },
+            {
+              "type": "Tab",
+              "cpu": 0,
+              "workingSetKiB": 132108,
+              "privateKiB": 70900
+            }
+          ],
+          "visual": {
+            "material": "glass",
+            "bodyBackground": "rgba(10, 10, 12, 0.82)",
+            "idleBeatWillChange": "auto",
+            "cssBlurLayers": 0,
+            "viewport": {
+              "width": 1280,
+              "height": 860
+            },
+            "horizontalOverflow": false
+          },
+          "counters": {
+            "gatewaySearches": 11,
+            "gatewayAborts": 2,
+            "startupSignals": 1,
+            "blockedExternalRequests": 0
+          },
+          "errors": [],
+          "limitations": [
+            "Synthetic data, blocked external requests, fresh disposable profile; no accounts or playback.",
+            "Offscreen BrowserWindow rendering capped at 60 fps; comparable renderer frame timing excludes foreground DWM smoothness and native backdrop GPU cost.",
+            "Secure AMP startup/CDM initialization, installed-binary behavior, provider-network latency, and subscription playback excluded.",
+            "capturePage returns app pixels without the external desktop backdrop."
+          ]
+        },
+        {
+          "versions": {
+            "node": "24.18.0",
+            "acorn": "8.16.0",
+            "ada": "3.4.4",
+            "amaro": "1.1.9",
+            "ares": "1.34.6",
+            "brotli": "1.0.9",
+            "cldr": "47.0",
+            "icu": "77.1",
+            "llhttp": "9.4.2",
+            "merve": "1.2.2",
+            "modules": "145",
+            "napi": "10",
+            "nbytes": "0.1.4",
+            "ncrypto": "0.0.1",
+            "nghttp2": "1.69.0",
+            "nghttp3": "",
+            "ngtcp2": "",
+            "openssl": "0.0.0",
+            "simdjson": "4.6.4",
+            "simdutf": "7.7.0",
+            "sqlite": "3.53.1",
+            "tz": "2025b",
+            "undici": "7.28.0",
+            "unicode": "16.0",
+            "uv": "1.52.1",
+            "uvwasi": "0.0.23",
+            "v8": "14.6.202.34-electron.0",
+            "zlib": "1.3.1",
+            "zstd": "1.6.0",
+            "electron": "41.10.7",
+            "chrome": "146.0.7680.216"
+          },
+          "os": "10.0.26200",
+          "materialRequested": "glass",
+          "nativeMaterial": "acrylic",
+          "loadedMs": 189.73,
+          "startup": {
+            "rendererReadyMs": 132,
+            "syncingAtReady": true,
+            "cachedTracksAtReady": 120,
+            "hostReadyMs": 314.61
+          },
+          "searches": {
+            "firstResultMs": 46.70000001788139,
+            "finalMs": 155.30000001192093,
+            "order": [
+              "spotify:search-probe-0",
+              "spotify:search-probe-1",
+              "spotify:search-probe-2",
+              "spotify:search-probe-3",
+              "spotify:search-probe-4",
+              "spotify:search-probe-5",
+              "spotify:search-probe-6",
+              "spotify:search-probe-7",
+              "spotify:search-probe-8",
+              "spotify:search-probe-9",
+              "spotify:search-probe-10",
+              "spotify:search-probe-11",
+              "spotify:search-probe-12",
+              "spotify:search-probe-13",
+              "spotify:search-probe-14",
+              "spotify:search-probe-15",
+              "spotify:search-probe-16",
+              "spotify:search-probe-17",
+              "soundcloud:search-probe-0",
+              "soundcloud:search-probe-1",
+              "soundcloud:search-probe-2",
+              "soundcloud:search-probe-3",
+              "soundcloud:search-probe-4",
+              "soundcloud:search-probe-5",
+              "youtube:search-probe-0",
+              "youtube:search-probe-1",
+              "youtube:search-probe-2",
+              "youtube:search-probe-3",
+              "youtube:search-probe-4",
+              "youtube:search-probe-5"
+            ],
+            "duplicateFetches": 1,
+            "staleResultsDiscarded": true,
+            "fetchAborts": 1,
+            "fetchCalls": 4
+          },
+          "menus": {
+            "frames": 151,
+            "medianFrameMs": 16.699999999999818,
+            "p95FrameMs": 16.799999999999727,
+            "maxFrameMs": 33.200000000000045,
+            "framesOver33Ms": 0,
+            "approximateMedianFps": 59.88023952095874,
+            "medianMenuCommitMs": 16.400000005960464,
+            "p95MenuCommitMs": 18.69999998807907
+          },
+          "mainCpuDuringMenuMs": 390,
+          "rendererMemoryKiB": {
+            "workingSetSize": 133332,
+            "peakWorkingSetSize": 134172,
+            "privateBytes": 72124
+          },
+          "processMetrics": [
+            {
+              "type": "Browser",
+              "cpu": 0,
+              "workingSetKiB": 136168,
+              "privateKiB": 107876
+            },
+            {
+              "type": "GPU",
+              "cpu": 0,
+              "workingSetKiB": 166904,
+              "privateKiB": 396840
+            },
+            {
+              "type": "Utility",
+              "cpu": 0,
+              "workingSetKiB": 54340,
+              "privateKiB": 12300
+            },
+            {
+              "type": "Tab",
+              "cpu": 0,
+              "workingSetKiB": 133332,
+              "privateKiB": 72124
+            }
+          ],
+          "visual": {
+            "material": "glass",
+            "bodyBackground": "rgba(10, 10, 12, 0.82)",
+            "idleBeatWillChange": "auto",
+            "cssBlurLayers": 0,
+            "viewport": {
+              "width": 1280,
+              "height": 860
+            },
+            "horizontalOverflow": false
+          },
+          "counters": {
+            "gatewaySearches": 11,
+            "gatewayAborts": 2,
+            "startupSignals": 1,
+            "blockedExternalRequests": 0
+          },
+          "errors": [],
+          "limitations": [
+            "Synthetic data, blocked external requests, fresh disposable profile; no accounts or playback.",
+            "Offscreen BrowserWindow rendering capped at 60 fps; comparable renderer frame timing excludes foreground DWM smoothness and native backdrop GPU cost.",
+            "Secure AMP startup/CDM initialization, installed-binary behavior, provider-network latency, and subscription playback excluded.",
+            "capturePage returns app pixels without the external desktop backdrop."
+          ]
+        }
+      ]
+    }
+  }
+}

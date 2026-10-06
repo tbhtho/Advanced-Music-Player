@@ -1,5 +1,7 @@
 import type { ProviderCollection, TrackCollection, UnifiedTrack } from "@amp/core";
 import type { CacheStore } from "./CacheStore";
+import { SharedRequests, mapConcurrent } from "@amp/core";
+import { createHash } from "node:crypto";
 import type { GatewayResponse } from "./types";
 import { StealthClient } from "./StealthClient";
 import { createHmac, randomBytes } from "node:crypto";
@@ -156,6 +158,8 @@ export class SpotifyPartnerGateway {
   private clientTokenExpiresAt = 0;
   private anonymousSession: SpotifyAnonymousSession | undefined;
   private anonymousSessionPromise: Promise<SpotifyAnonymousSession | undefined> | undefined;
+  private searches = new SharedRequests<GatewayResponse<UnifiedTrack[]>>();
+  private clientTokenPromise: Promise<string | undefined> | undefined;
 
   constructor(cache: CacheStore) {
     this.client = new StealthClient();
@@ -170,13 +174,25 @@ export class SpotifyPartnerGateway {
     await this.discoverOperationHashes();
   }
 
-  async search(query: string, accessToken: string): Promise<GatewayResponse<UnifiedTrack[]>> {
-    const cacheKey = `spotify:search:${query.trim().toLowerCase()}`;
+  search(query: string, accessToken: string, signal?: AbortSignal): Promise<GatewayResponse<UnifiedTrack[]>> {
+    const normalized = query.trim();
+    if (!normalized) return Promise.resolve({ ok: true, data: [], source: "internal" });
+    const cacheKey = `spotify:search:v2:${accountKey(accessToken)}:${normalized.toLowerCase()}`;
+    return this.searches.run(cacheKey, (sharedSignal) => this.searchOnce(normalized, accessToken, cacheKey, sharedSignal), signal);
+  }
+
+  clearPendingReads(): void {
+    this.searches.clear();
+  }
+
+  private async searchOnce(query: string, accessToken: string, cacheKey: string, signal: AbortSignal): Promise<GatewayResponse<UnifiedTrack[]>> {
+    signal.throwIfAborted();
     const cached = this.cache.get<UnifiedTrack[]>(cacheKey);
     if (cached) {
       return { ok: true, data: cached, source: "cache" };
     }
 
+    if (!this.operationHashes.has("searchDesktop")) await this.initialize();
     const hash = this.operationHashes.get("searchDesktop");
     if (!hash) {
       return { ok: false, error: "Spotify Partner API operation hashes not available.", source: "fallback" };
@@ -184,7 +200,9 @@ export class SpotifyPartnerGateway {
 
     try {
       const clientToken = await this.ensureClientToken();
+      signal.throwIfAborted();
       const response = await this.client.request(SPOTIFY_PARTNER_API_BASE, {
+        signal,
         method: "POST",
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -224,7 +242,8 @@ export class SpotifyPartnerGateway {
           .filter((track): track is PartnerTrackData => Boolean(track))
           .map(mapPartnerTrack) ?? [];
 
-      this.cache.set(cacheKey, tracks, SEARCH_CACHE_TTL_MS);
+      signal.throwIfAborted();
+      this.cache.setMemoryOnly(cacheKey, tracks, SEARCH_CACHE_TTL_MS);
       return { ok: true, data: tracks, source: "internal" };
     } catch (error) {
       return {
@@ -236,7 +255,7 @@ export class SpotifyPartnerGateway {
   }
 
   async getCollections(accessToken: string): Promise<GatewayResponse<ProviderCollection[]>> {
-    const cacheKey = "spotify:collections";
+    const cacheKey = `spotify:collections:${accountKey(accessToken)}`;
     const cached = this.cache.get<ProviderCollection[]>(cacheKey);
     if (cached) {
       return { ok: true, data: cached, source: "cache" };
@@ -278,7 +297,7 @@ export class SpotifyPartnerGateway {
         : [])
     ];
 
-    this.cache.set(cacheKey, collections, COLLECTION_CACHE_TTL_MS);
+    this.cache.setMemoryOnly(cacheKey, collections, COLLECTION_CACHE_TTL_MS);
     return { ok: true, data: collections, source: "internal" };
   }
 
@@ -286,7 +305,7 @@ export class SpotifyPartnerGateway {
     collectionId: string,
     accessToken: string
   ): Promise<GatewayResponse<TrackCollection>> {
-    const cacheKey = `spotify:collection:${collectionId}`;
+    const cacheKey = `spotify:collection:${accountKey(accessToken)}:${collectionId}`;
     const cached = this.cache.get<TrackCollection>(cacheKey);
     if (cached) {
       return { ok: true, data: cached, source: "cache" };
@@ -453,7 +472,7 @@ export class SpotifyPartnerGateway {
         items: tracks
       };
 
-      this.cache.set(cacheKey, collection, COLLECTION_CACHE_TTL_MS);
+      this.cache.setMemoryOnly(cacheKey, collection, COLLECTION_CACHE_TTL_MS);
       return { ok: true, data: collection, source: "internal" };
     } catch (error) {
       return {
@@ -516,7 +535,7 @@ export class SpotifyPartnerGateway {
         items: tracks
       };
 
-      this.cache.set(cacheKey, collection, COLLECTION_CACHE_TTL_MS);
+      this.cache.setMemoryOnly(cacheKey, collection, COLLECTION_CACHE_TTL_MS);
       return { ok: true, data: collection, source: "internal" };
     } catch (error) {
       return {
@@ -739,6 +758,16 @@ export class SpotifyPartnerGateway {
       return this.clientToken;
     }
 
+    if (this.clientTokenPromise) return this.clientTokenPromise;
+    const pending = this.fetchSearchClientToken().finally(() => {
+      if (this.clientTokenPromise === pending) this.clientTokenPromise = undefined;
+    });
+    this.clientTokenPromise = pending;
+    return pending;
+  }
+
+  private async fetchSearchClientToken(): Promise<string | undefined> {
+
     try {
       const response = await this.client.request(SPOTIFY_CLIENT_TOKEN_API, {
         method: "POST",
@@ -780,8 +809,11 @@ export class SpotifyPartnerGateway {
       return this.hashDiscoveryPromise;
     }
 
-    this.hashDiscoveryPromise = this.performHashDiscovery();
-    return this.hashDiscoveryPromise;
+    const pending = this.performHashDiscovery().finally(() => {
+      if (this.hashDiscoveryPromise === pending) this.hashDiscoveryPromise = undefined;
+    });
+    this.hashDiscoveryPromise = pending;
+    return pending;
   }
 
   private async performHashDiscovery(): Promise<void> {
@@ -791,6 +823,7 @@ export class SpotifyPartnerGateway {
       for (const entry of cached) {
         this.operationHashes.set(entry.name, entry.hash);
       }
+      this.seedWellKnownHashes();
       return;
     }
 
@@ -809,8 +842,8 @@ export class SpotifyPartnerGateway {
       const jsUrls = this.extractJsUrls(htmlResponse.body, SPOTIFY_WEB_APP_URL);
       const hashes: OperationHashEntry[] = [];
 
-      // Search bundles for operation hash mappings
-      for (const url of jsUrls.slice(0, 8)) {
+      // Two reads at a time shorten readiness without increasing the number of bundle requests.
+      const discovered = await mapConcurrent(jsUrls.slice(0, 8), 2, async (url) => {
         try {
           const bundleResponse = await this.client.request(url, {
             method: "GET",
@@ -818,16 +851,19 @@ export class SpotifyPartnerGateway {
           });
 
           if (bundleResponse.status === 200) {
-            const extracted = this.extractOperationHashes(bundleResponse.body);
-            for (const [name, hash] of extracted) {
-              if (!this.operationHashes.has(name)) {
-                this.operationHashes.set(name, hash);
-                hashes.push({ name, hash, fetchedAt: Date.now() });
-              }
-            }
+            return this.extractOperationHashes(bundleResponse.body);
           }
         } catch {
           // Bundle fetch failure is non-critical.
+        }
+        return new Map<string, string>();
+      });
+      for (const extracted of discovered) {
+        for (const [name, hash] of extracted) {
+          if (!this.operationHashes.has(name)) {
+            this.operationHashes.set(name, hash);
+            hashes.push({ name, hash, fetchedAt: Date.now() });
+          }
         }
       }
 
@@ -933,6 +969,10 @@ interface PartnerTrackData {
   artists?: {
     items?: Array<{ profile?: { name?: string }; uri?: string }>;
   };
+}
+
+function accountKey(accessToken: string): string {
+  return createHash("sha256").update(accessToken).digest("hex");
 }
 
 function mapPartnerTrack(track: PartnerTrackData): UnifiedTrack {

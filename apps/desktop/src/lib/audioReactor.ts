@@ -73,6 +73,8 @@ export class AudioReactor {
       return;
     }
     this.running = true;
+    const targetEl = this.resolveTarget();
+    if (targetEl) targetEl.style.willChange = "opacity, transform";
     this.lastFrameAt = performance.now();
     this.raf = requestAnimationFrame(this.tick);
   }
@@ -93,6 +95,7 @@ export class AudioReactor {
     if (targetEl) {
       targetEl.style.setProperty("--beat", "0");
       targetEl.style.setProperty("--energy", "0");
+      targetEl.style.willChange = "auto";
     }
     if (this.loopbackCtx?.state === "running") {
       void this.loopbackCtx.suspend().catch(() => undefined);

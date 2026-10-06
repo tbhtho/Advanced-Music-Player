@@ -14,6 +14,8 @@ export class ProviderGateway {
   private soundcloud: SoundCloudInternalGateway;
   private deezer: DeezerGateway;
   private youtube: YouTubeMusicGateway;
+  private cacheReady: Promise<void> | undefined;
+  private initialization: Promise<void> | undefined;
 
   constructor(userDataPath: string) {
     this.cache = new CacheStore(userDataPath);
@@ -23,34 +25,43 @@ export class ProviderGateway {
     this.youtube = new YouTubeMusicGateway(this.cache);
   }
 
-  async initialize(): Promise<void> {
-    await this.cache.initialize();
-    await Promise.all([this.spotify.initialize(), this.soundcloud.initialize()]);
+  private ensureCacheReady(): Promise<void> {
+    this.cacheReady ??= this.cache.initialize();
+    return this.cacheReady;
   }
 
-  async request(req: GatewayRequest): Promise<GatewayResponse> {
+  initialize(): Promise<void> {
+    this.initialization ??= this.ensureCacheReady().then(async () => {
+      await Promise.all([this.spotify.initialize(), this.soundcloud.initialize()]);
+    });
+    return this.initialization;
+  }
+
+  async request(req: GatewayRequest, signal?: AbortSignal): Promise<GatewayResponse> {
+    await this.ensureCacheReady();
+    signal?.throwIfAborted();
     switch (req.provider) {
       case "spotify":
-        return this.handleSpotifyRequest(req);
+        return this.handleSpotifyRequest(req, signal);
       case "soundcloud":
-        return this.handleSoundCloudRequest(req);
+        return this.handleSoundCloudRequest(req, signal);
       case "deezer":
         return this.handleDeezerRequest(req);
       case "youtube":
-        return this.handleYouTubeRequest(req);
+        return this.handleYouTubeRequest(req, signal);
       default:
         return { ok: false, error: `Unknown provider: ${req.provider}`, source: "fallback" };
     }
   }
 
-  private async handleYouTubeRequest(req: GatewayRequest): Promise<GatewayResponse> {
+  private async handleYouTubeRequest(req: GatewayRequest, signal?: AbortSignal): Promise<GatewayResponse> {
     switch (req.operation) {
       case "search": {
         const query = req.variables?.query as string;
         if (!query) {
           return { ok: false, error: "Search query required.", source: "fallback" };
         }
-        return this.youtube.search(query);
+        return this.youtube.search(query, signal);
       }
       default:
         return { ok: false, error: `Unknown YouTube operation: ${req.operation}`, source: "fallback" };
@@ -91,6 +102,8 @@ export class ProviderGateway {
   }
 
   invalidateProviderCache(provider: "spotify" | "soundcloud" | "all"): void {
+    if (provider === "spotify" || provider === "all") this.spotify.clearPendingReads();
+    if (provider === "soundcloud" || provider === "all") this.soundcloud.clearPendingReads();
     if (provider === "all") {
       this.cache.invalidate();
     } else {
@@ -102,7 +115,7 @@ export class ProviderGateway {
     this.soundcloud.clearSession();
   }
 
-  private async handleSpotifyRequest(req: GatewayRequest): Promise<GatewayResponse> {
+  private async handleSpotifyRequest(req: GatewayRequest, signal?: AbortSignal): Promise<GatewayResponse> {
     const accessToken = req.variables?.accessToken as string | undefined;
     if (!accessToken) {
       return { ok: false, error: "Spotify access token required.", source: "fallback" };
@@ -114,7 +127,7 @@ export class ProviderGateway {
         if (!query) {
           return { ok: false, error: "Search query required.", source: "fallback" };
         }
-        const result = await this.spotify.search(query, accessToken);
+        const result = await this.spotify.search(query, accessToken, signal);
         return result;
       }
       case "getCollections": {
@@ -134,7 +147,7 @@ export class ProviderGateway {
     }
   }
 
-  private async handleSoundCloudRequest(req: GatewayRequest): Promise<GatewayResponse> {
+  private async handleSoundCloudRequest(req: GatewayRequest, signal?: AbortSignal): Promise<GatewayResponse> {
     const accessToken = req.variables?.accessToken as string | undefined;
 
     switch (req.operation) {
@@ -143,7 +156,7 @@ export class ProviderGateway {
         if (!query) {
           return { ok: false, error: "Search query required.", source: "fallback" };
         }
-        return this.soundcloud.search(query);
+        return this.soundcloud.search(query, signal);
       }
       case "resolveStream": {
         const track = req.variables?.track as UnifiedTrack | undefined;
@@ -158,7 +171,7 @@ export class ProviderGateway {
           return { ok: false, error: "Track required.", source: "fallback" };
         }
         const limit = (req.variables?.limit as number | undefined) ?? 20;
-        return this.soundcloud.relatedTracks(track, limit);
+        return this.soundcloud.relatedTracks(track, limit, signal);
       }
       case "getCollections": {
         if (!accessToken) {

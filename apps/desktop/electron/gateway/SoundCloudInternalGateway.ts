@@ -10,6 +10,7 @@ import type { ProviderCollection, TrackCollection, UnifiedTrack } from "@amp/cor
 import type { CacheStore } from "./CacheStore";
 import type { GatewayResponse } from "./types";
 import { StealthClient } from "./StealthClient";
+import { SharedRequests } from "@amp/core";
 import { resolveMediaInPage, probeNativePlaybackOnce } from "../SoundCloudResolverWindow";
 import { appendFileSync, statSync, unlinkSync } from "node:fs";
 import { createHash } from "node:crypto";
@@ -178,6 +179,7 @@ export class SoundCloudInternalGateway {
    *  Sent as `Authorization: OAuth …` on stream resolution so monetized / ad-supported tracks
    *  (which 404 for anonymous client_id requests) play for the logged-in user. */
   private soundCloudOAuthToken: string | undefined;
+  private searches = new SharedRequests<GatewayResponse<UnifiedTrack[]>>();
 
   constructor(cache: CacheStore) {
     // Cookie-less: SoundCloud's anonymous api-v2 + media endpoints need no cookies, and a shared
@@ -193,6 +195,7 @@ export class SoundCloudInternalGateway {
   }
 
   clearSession(): void {
+    this.clearPendingReads();
     this.soundCloudOAuthToken = undefined;
     this.authenticatedUserIds.clear();
     this.cache.invalidate(/^soundcloud:/);
@@ -203,7 +206,18 @@ export class SoundCloudInternalGateway {
     return (await this.ensureAssetBundle()).clientId;
   }
 
-  async search(query: string): Promise<GatewayResponse<UnifiedTrack[]>> {
+  clearPendingReads(): void {
+    this.searches.clear();
+  }
+
+  search(query: string, signal?: AbortSignal): Promise<GatewayResponse<UnifiedTrack[]>> {
+    const normalized = query.trim();
+    if (!normalized) return Promise.resolve({ ok: true, data: [], source: "internal" });
+    return this.searches.run(`search:${normalized.toLowerCase()}`, (sharedSignal) => this.searchOnce(normalized, sharedSignal), signal);
+  }
+
+  private async searchOnce(query: string, signal: AbortSignal): Promise<GatewayResponse<UnifiedTrack[]>> {
+    signal.throwIfAborted();
     // One canonical query string for BOTH the cache key and the request, so "song " and "song"
     // hit the same cache entry instead of firing separate API variants.
     const normalizedQuery = query.trim();
@@ -223,6 +237,7 @@ export class SoundCloudInternalGateway {
 
     try {
       const bundle = await this.ensureAssetBundle();
+      signal.throwIfAborted();
       const url = new URL(`${SOUNDCLOUD_PUBLIC_API_BASE}/search/tracks`);
       url.searchParams.set("q", normalizedQuery);
       url.searchParams.set("limit", "18");
@@ -232,6 +247,7 @@ export class SoundCloudInternalGateway {
       url.searchParams.set("app_locale", bundle.appLocale);
 
       const response = await this.client.request(url.toString(), {
+        signal,
         method: "GET",
         headers: {
           Accept: "application/json, text/javascript, */*; q=0.01"
@@ -255,6 +271,7 @@ export class SoundCloudInternalGateway {
           .map(mapInternalTrack)
           .filter((track) => track.playable) ?? [];
 
+      signal.throwIfAborted();
       this.cache.set(cacheKey, tracks, SEARCH_CACHE_TTL_MS);
       this.publicRateLimitedUntil = 0;
       return { ok: true, data: tracks, source: "internal" };
@@ -272,7 +289,12 @@ export class SoundCloudInternalGateway {
    * endpoint (the same one the web player uses for "next up"/autoplay). This is real cross-track
    * discovery — the backbone of song-seeded Stations and the SoundCloud side of Daily Mixes.
    */
-  async relatedTracks(track: UnifiedTrack, limit = 20): Promise<GatewayResponse<UnifiedTrack[]>> {
+  relatedTracks(track: UnifiedTrack, limit = 20, signal?: AbortSignal): Promise<GatewayResponse<UnifiedTrack[]>> {
+    return this.searches.run(`related:${extractSoundCloudNumericTrackId(track)}:${limit}`, (sharedSignal) => this.relatedTracksOnce(track, limit, sharedSignal), signal);
+  }
+
+  private async relatedTracksOnce(track: UnifiedTrack, limit: number, signal: AbortSignal): Promise<GatewayResponse<UnifiedTrack[]>> {
+    signal.throwIfAborted();
     // The related endpoint needs the BARE numeric id, but a unified track carries the SoundCloud URN
     // (e.g. "soundcloud:tracks:1685274354") as its providerTrackId. Extract the numeric id or the
     // request 404s and discovery silently returns nothing.
@@ -293,6 +315,7 @@ export class SoundCloudInternalGateway {
     try {
       const bundle = await this.ensureAssetBundle();
       const url = new URL(`${SOUNDCLOUD_PUBLIC_API_BASE}/tracks/${numericId}/related`);
+      signal.throwIfAborted();
       url.searchParams.set("limit", String(limit));
       url.searchParams.set("linked_partitioning", "1");
       url.searchParams.set("client_id", bundle.clientId);
@@ -300,6 +323,7 @@ export class SoundCloudInternalGateway {
       url.searchParams.set("app_locale", bundle.appLocale);
 
       const response = await this.client.request(url.toString(), {
+        signal,
         method: "GET",
         headers: { Accept: "application/json, text/javascript, */*; q=0.01" }
       });
@@ -314,6 +338,7 @@ export class SoundCloudInternalGateway {
       const json = JSON.parse(response.body) as SoundCloudInternalSearchResponse;
       const tracks = (json.collection ?? []).map(mapInternalTrack).filter((track) => track.playable);
 
+      signal.throwIfAborted();
       this.cache.set(cacheKey, tracks, SEARCH_CACHE_TTL_MS);
       this.publicRateLimitedUntil = 0;
       return { ok: true, data: tracks, source: "internal" };
@@ -546,7 +571,7 @@ export class SoundCloudInternalGateway {
   }
 
   async getCollections(accessToken: string): Promise<GatewayResponse<ProviderCollection[]>> {
-    const cacheKey = "soundcloud:collections";
+    const cacheKey = `soundcloud:collections:${createHash("sha256").update(accessToken).digest("hex")}`;
     const cached = this.cache.get<ProviderCollection[]>(cacheKey);
     if (cached) {
       return { ok: true, data: cached, source: "cache" };
@@ -569,7 +594,7 @@ export class SoundCloudInternalGateway {
         ...playlists.map((playlist) => mapInternalPlaylistCollection(playlist))
       ];
 
-      this.cache.set(cacheKey, collections, COLLECTION_CACHE_TTL_MS);
+      this.cache.setMemoryOnly(cacheKey, collections, COLLECTION_CACHE_TTL_MS);
       return { ok: true, data: collections, source: "internal" };
     } catch (error) {
       return {
@@ -584,7 +609,7 @@ export class SoundCloudInternalGateway {
     collectionId: string,
     accessToken: string
   ): Promise<GatewayResponse<TrackCollection>> {
-    const cacheKey = `soundcloud:collection:${collectionId}`;
+    const cacheKey = `soundcloud:collection:${createHash("sha256").update(accessToken).digest("hex")}:${collectionId}`;
     const cached = this.cache.get<TrackCollection>(cacheKey);
     if (cached) {
       return { ok: true, data: cached, source: "cache" };
@@ -604,7 +629,7 @@ export class SoundCloudInternalGateway {
     // Auth-aware cache: major-label tracks return different data (track_authorization,
     // access=playable) when requested with an OAuth token vs anonymously.
     const cacheKey = authHeaders.Authorization
-      ? `soundcloud:track:auth:${track.providerTrackId}`
+      ? `soundcloud:track:auth:${createHash("sha256").update(authHeaders.Authorization).digest("hex")}:${track.providerTrackId}`
       : `soundcloud:track:${track.providerTrackId}`;
     const cached = this.cache.get<SoundCloudInternalTrack>(cacheKey);
     if (cached) {
@@ -640,7 +665,8 @@ export class SoundCloudInternalGateway {
       }
 
       const json = JSON.parse(response.body) as SoundCloudInternalTrack;
-      this.cache.set(cacheKey, json, TRACK_CACHE_TTL_MS);
+      // Raw track metadata can contain signed playback authorization even for public tracks.
+      this.cache.setMemoryOnly(cacheKey, json, TRACK_CACHE_TTL_MS);
       return { ok: true, data: json, source: "internal" };
     } catch (error) {
       return {
@@ -1001,7 +1027,7 @@ export class SoundCloudInternalGateway {
         items: dedupeTracksById(likes.map(mapInternalTrack))
       };
 
-      this.cache.set(cacheKey, collection, COLLECTION_CACHE_TTL_MS);
+      this.cache.setMemoryOnly(cacheKey, collection, COLLECTION_CACHE_TTL_MS);
       return { ok: true, data: collection, source: "internal" };
     } catch (error) {
       return {
@@ -1054,7 +1080,7 @@ export class SoundCloudInternalGateway {
         items: (playlist.tracks ?? []).map(mapInternalTrack).filter((track) => track.playable)
       };
 
-      this.cache.set(cacheKey, collection, COLLECTION_CACHE_TTL_MS);
+      this.cache.setMemoryOnly(cacheKey, collection, COLLECTION_CACHE_TTL_MS);
       return { ok: true, data: collection, source: "internal" };
     } catch (error) {
       return {

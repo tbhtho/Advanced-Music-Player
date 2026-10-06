@@ -8,6 +8,7 @@ import {
   ipcMain,
   Menu,
   nativeImage,
+  nativeTheme,
   net,
   protocol,
   safeStorage,
@@ -39,6 +40,9 @@ import { trayIconDataUrl, appIconDataUrl } from "./trayIconData.js";
 import { listFirefoxProfiles, readFirefoxCookies } from "./firefoxCookies.js";
 import { readSafariCookies, FullDiskAccessError } from "./safariCookies.js";
 import { clearSoundCloudResolverSession } from "./SoundCloudResolverWindow.js";
+import { applyWindowMaterial, selectWindowMaterial, type WindowMaterial } from "./windowMaterial.js";
+
+let windowMaterial: WindowMaterial = "opaque";
 
 type Provider = "spotify" | "soundcloud";
 type ProviderStorageMode = "none" | "local-secure" | "memory-only";
@@ -3643,6 +3647,8 @@ async function createMainWindow() {
 
   mainWindowStartupComplete = false;
 
+  const preferredMaterial = selectWindowMaterial(process.platform, os.release(), nativeTheme.shouldUseHighContrastColors, nativeTheme.prefersReducedTransparency);
+
   const window = new BrowserWindow({
     title: "AMP",
     icon: brandIcon(appIconDataUrl),
@@ -3651,12 +3657,15 @@ async function createMainWindow() {
     minWidth: startupWindowBounds.width,
     minHeight: startupWindowBounds.height,
     show: false,
-    backgroundColor: "#0e1110",
+    backgroundColor: preferredMaterial === "opaque" ? "#101012" : "#00000000",
+    transparent: preferredMaterial !== "opaque",
+    ...(preferredMaterial === "vibrancy" ? { vibrancy: "under-window" as const, visualEffectState: "active" as const } : {}),
     autoHideMenuBar: true,
     frame: !usesCustomWindowChrome(),
     titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
     webPreferences: {
       preload: preloadPath,
+      additionalArguments: [`--amp-window-material=${preferredMaterial}`],
       contextIsolation: true,
       nodeIntegration: false,
       plugins: true,
@@ -3675,6 +3684,14 @@ async function createMainWindow() {
       webSecurity: false
     }
   });
+  windowMaterial = applyWindowMaterial(window, preferredMaterial);
+  const updateMaterial = () => {
+    if (window.isDestroyed()) return;
+    windowMaterial = applyWindowMaterial(window, selectWindowMaterial(process.platform, os.release(), nativeTheme.shouldUseHighContrastColors, nativeTheme.prefersReducedTransparency));
+    window.webContents.send("spot-cloud:window-material-changed", windowMaterial);
+  };
+  nativeTheme.on("updated", updateMaterial);
+  window.once("closed", () => nativeTheme.off("updated", updateMaterial));
   window.center();
 
   // Guard against a stale off-screen saved position (window spawning half off the display).
@@ -4169,6 +4186,7 @@ handleTrustedIpc("spot-cloud:resolve-artwork", async (_, request: ArtworkRequest
 });
 
 handleTrustedIpc("spot-cloud:get-window-state", async () => getDesktopWindowState());
+handleTrustedIpc("spot-cloud:get-window-material", async () => windowMaterial);
 
 handleTrustedIpc("spot-cloud:finish-startup-window", async () => {
   mainWindowStartupComplete = true;
@@ -4348,7 +4366,8 @@ handleTrustedIpc("spot-cloud:cancel-connect-provider", (_, provider: Provider) =
   return { ok: true };
 });
 
-handleTrustedIpc("spot-cloud:gateway-request", async (_, request) => {
+const pendingGatewayRequests = new Map<string, AbortController>();
+handleTrustedIpc("spot-cloud:gateway-request", async (event, request) => {
   if (!providerGateway) {
     return { ok: false, error: "Provider gateway not initialized.", source: "fallback" };
   }
@@ -4363,15 +4382,28 @@ handleTrustedIpc("spot-cloud:gateway-request", async (_, request) => {
     return { ok: false, error: "Malformed gateway request.", source: "fallback" };
   }
 
+  if (request.operation === "cancelRequest") {
+    const id = request.variables?.requestId;
+    if (typeof id === "string") pendingGatewayRequests.get(`${event.sender.id}:${id}`)?.abort();
+    return { ok: true, source: "internal" };
+  }
+  const id = typeof request.requestId === "string" && request.requestId.length <= 80 ? `${event.sender.id}:${request.requestId}` : undefined;
+  const controller = id ? new AbortController() : undefined;
+  if (id && controller) {
+    pendingGatewayRequests.get(id)?.abort();
+    pendingGatewayRequests.set(id, controller);
+  }
   try {
-    return await providerGateway.request(request);
+    return await providerGateway.request(request, controller?.signal);
   } catch (error) {
-    logStartup("gateway:request-failed", error);
+    if (!controller?.signal.aborted) logStartup("gateway:request-failed", error);
     return {
       ok: false,
       error: error instanceof Error ? error.message : "Gateway request failed.",
       source: "fallback"
     };
+  } finally {
+    if (id && pendingGatewayRequests.get(id) === controller) pendingGatewayRequests.delete(id);
   }
 });
 

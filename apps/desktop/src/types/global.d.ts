@@ -97,6 +97,7 @@ interface GatewayRequest {
   provider: Provider | "deezer";
   operation: string;
   variables?: Record<string, unknown>;
+  requestId?: string;
 }
 
 interface GatewayResponse<T = unknown> {
@@ -108,6 +109,11 @@ interface GatewayResponse<T = unknown> {
 }
 
 interface SpotCloudBridge {
+  windowMaterial?: {
+    initial: string;
+    get(): Promise<"opaque" | "acrylic" | "vibrancy">;
+    onChanged(callback: (material: "opaque" | "acrylic" | "vibrancy") => void): () => void;
+  };
   runtime: {
     getInfo(): Promise<RuntimeInfo>;
     reload(): Promise<RuntimeInfo>;

@@ -1,13 +1,29 @@
 import { promises as fs, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { CacheEntry } from "./types";
+import { Worker } from "node:worker_threads";
 
-// Hard ceiling on cached entries — beyond this the oldest entries are evicted so a long session
-// can't grow memory (and the store.json flush) without bound. Eviction drains down to the
-// low-water mark so the O(n log n) oldest-first sort amortizes over many inserts instead of
-// firing on every write once the cache sits at the cap.
+// Bound both entry count and estimated retained memory. Map insertion order gives oldest-first
+// eviction without sorting; draining to a low-water mark amortizes cleanup over later inserts.
 const MAX_ENTRIES = 600;
 const LOW_WATER_ENTRIES = 480;
+const MAX_CACHE_BYTES = 8 * 1024 * 1024;
+const LOW_WATER_BYTES = 6 * 1024 * 1024;
+const MAX_STORE_BYTES = 32 * 1024 * 1024;
+
+// Conservative accounting avoids serializing every response just to enforce a memory budget.
+function estimateBytes(value: unknown, depth = 0): number {
+  if (typeof value === "string") return value.length * 2 + 8;
+  if (value === null || typeof value !== "object") return 16;
+  if (depth > 16) return MAX_CACHE_BYTES;
+  if (ArrayBuffer.isView(value)) return value.byteLength + 64;
+  let bytes = 64;
+  for (const [key, item] of Object.entries(value)) {
+    bytes += key.length * 2 + estimateBytes(item, depth + 1) + 16;
+    if (bytes > MAX_CACHE_BYTES) break;
+  }
+  return bytes;
+}
 
 export class CacheStore {
   private cacheDir: string;
@@ -18,14 +34,17 @@ export class CacheStore {
   private flushTimer: ReturnType<typeof setTimeout> | undefined;
   private flushQueue: Promise<void> = Promise.resolve();
   private writeGeneration = 0;
+  private entryBytes = new Map<string, number>();
+  private totalBytes = 0;
+  private initialization: Promise<void> | undefined;
 
   constructor(userDataPath: string) {
     this.cacheDir = path.join(userDataPath, "gateway-cache");
   }
 
-  async initialize(): Promise<void> {
-    await fs.mkdir(this.cacheDir, { recursive: true });
-    await this.hydrate();
+  initialize(): Promise<void> {
+    this.initialization ??= fs.mkdir(this.cacheDir, { recursive: true }).then(() => this.hydrate());
+    return this.initialization;
   }
 
   get<T>(key: string): T | undefined {
@@ -34,11 +53,9 @@ export class CacheStore {
       return undefined;
     }
     if (entry.expiresAt <= Date.now()) {
-      this.memoryCache.delete(key);
-      this.memoryOnlyKeys.delete(key);
-      this.dirty = true;
-      this.revision += 1;
-      this.scheduleFlush();
+      const persistent = !this.memoryOnlyKeys.has(key);
+      this.deleteEntry(key);
+      if (persistent) this.markDirty();
       return undefined;
     }
     return entry.data as T;
@@ -51,12 +68,23 @@ export class CacheStore {
 
   /** Cache credentials and signed media URLs for this process without writing them to disk. */
   setMemoryOnly(key: string, data: unknown, ttlMs: number, etag?: string): void {
+    const replacesPersistent = this.memoryCache.has(key) && !this.memoryOnlyKeys.has(key);
     this.memoryOnlyKeys.add(key);
     this.storeEntry(key, data, ttlMs, etag);
+    if (replacesPersistent) this.markDirty();
   }
 
   private storeEntry(key: string, data: unknown, ttlMs: number, etag?: string): void {
     const now = Date.now();
+    const bytes = estimateBytes(data) + Buffer.byteLength(key, "utf8") + 128;
+    const memoryOnly = this.memoryOnlyKeys.has(key);
+    this.deleteEntry(key);
+    if (memoryOnly) this.memoryOnlyKeys.add(key);
+    if (bytes > MAX_CACHE_BYTES) {
+      this.memoryOnlyKeys.delete(key);
+      if (!memoryOnly) this.markDirty();
+      return;
+    }
     this.memoryCache.set(key, {
       key,
       data,
@@ -64,54 +92,75 @@ export class CacheStore {
       expiresAt: now + ttlMs,
       createdAt: now
     });
-    if (this.memoryCache.size > MAX_ENTRIES) {
+    this.entryBytes.set(key, bytes);
+    this.totalBytes += bytes;
+    if (this.memoryCache.size > MAX_ENTRIES || this.totalBytes > MAX_CACHE_BYTES) {
       this.evictStale(now);
     }
+    if (!memoryOnly) this.markDirty();
+  }
+
+  private markDirty(): void {
     this.dirty = true;
-    this.revision += 1;
+    this.revision++;
     this.scheduleFlush();
+  }
+
+  private deleteEntry(key: string): void {
+    this.totalBytes -= this.entryBytes.get(key) ?? 0;
+    this.entryBytes.delete(key);
+    this.memoryCache.delete(key);
+    this.memoryOnlyKeys.delete(key);
   }
 
   /** Drop expired entries, then oldest-first down to the low-water mark. */
   private evictStale(now: number): void {
+    let removedPersistent = false;
     for (const [key, entry] of this.memoryCache) {
       if (entry.expiresAt <= now) {
-        this.memoryCache.delete(key);
-        this.memoryOnlyKeys.delete(key);
+        const persistent = !this.memoryOnlyKeys.has(key);
+        this.deleteEntry(key);
+        removedPersistent ||= persistent;
       }
     }
-    if (this.memoryCache.size <= MAX_ENTRIES) {
+    if (this.memoryCache.size <= MAX_ENTRIES && this.totalBytes <= MAX_CACHE_BYTES) {
+      if (removedPersistent) this.markDirty();
       return;
     }
-    const oldestFirst = [...this.memoryCache.values()].sort((a, b) => a.createdAt - b.createdAt);
-    for (const entry of oldestFirst.slice(0, this.memoryCache.size - LOW_WATER_ENTRIES)) {
-      this.memoryCache.delete(entry.key);
-      this.memoryOnlyKeys.delete(entry.key);
+    // Map insertion order already tracks age (overwrites move to the end), avoiding repeated sorts.
+    for (const key of this.memoryCache.keys()) {
+      if (this.memoryCache.size <= LOW_WATER_ENTRIES && this.totalBytes <= LOW_WATER_BYTES) break;
+      const persistent = !this.memoryOnlyKeys.has(key);
+      this.deleteEntry(key);
+      removedPersistent ||= persistent;
     }
+    if (removedPersistent) this.markDirty();
   }
 
   invalidate(pattern?: RegExp): void {
     if (!pattern) {
       this.memoryCache.clear();
       this.memoryOnlyKeys.clear();
-      this.dirty = true;
-      this.revision += 1;
-      this.scheduleFlush();
+      this.entryBytes.clear();
+      this.totalBytes = 0;
+      this.markDirty();
       return;
     }
 
+    let removedPersistent = false;
     for (const key of this.memoryCache.keys()) {
+      pattern.lastIndex = 0;
       if (pattern.test(key)) {
-        this.memoryCache.delete(key);
-        this.memoryOnlyKeys.delete(key);
-        this.dirty = true;
-        this.revision += 1;
+        const persistent = !this.memoryOnlyKeys.has(key);
+        this.deleteEntry(key);
+        removedPersistent ||= persistent;
       }
     }
-    this.scheduleFlush();
+    if (removedPersistent) this.markDirty();
   }
 
   private scheduleFlush(): void {
+    if (!this.dirty) return;
     if (this.flushTimer) {
       clearTimeout(this.flushTimer);
     }
@@ -119,13 +168,14 @@ export class CacheStore {
       this.flushTimer = undefined;
       this.flush();
     }, 2000);
+    this.flushTimer.unref?.();
   }
 
   private writeSnapshotSync(entries: CacheEntry[]): void {
     const targetPath = path.join(this.cacheDir, "store.json");
     const temporaryPath = `${targetPath}.${process.pid}.sync.${Date.now()}.tmp`;
     try {
-      writeFileSync(temporaryPath, JSON.stringify(entries, null, 2), "utf8");
+      writeFileSync(temporaryPath, JSON.stringify(entries), "utf8");
       renameSync(temporaryPath, targetPath);
     } finally {
       rmSync(temporaryPath, { force: true });
@@ -172,7 +222,7 @@ export class CacheStore {
     const entries = Array.from(this.memoryCache.values()).filter(
       (entry) => entry.expiresAt > now && !this.memoryOnlyKeys.has(entry.key)
     );
-    const payload = JSON.stringify(entries, null, 2);
+    const payload = JSON.stringify(entries);
     const targetPath = path.join(this.cacheDir, "store.json");
     const temporaryPath = `${targetPath}.${process.pid}.${generation}.tmp`;
 
@@ -201,22 +251,36 @@ export class CacheStore {
 
   private async hydrate(): Promise<void> {
     try {
-      const raw = await fs.readFile(path.join(this.cacheDir, "store.json"), "utf8");
-      const entries = JSON.parse(raw) as CacheEntry[];
+      const storePath = path.join(this.cacheDir, "store.json");
+      const size = (await fs.stat(storePath)).size;
+      if (size > MAX_STORE_BYTES) { this.markDirty(); return; }
+      // Old/unbounded stores can be large. Parse and trim them off the Electron event loop.
+      const entries = size > 4 * 1024 * 1024
+        ? await this.readLargeStore(storePath)
+        : JSON.parse(await fs.readFile(storePath, "utf8")) as CacheEntry[];
+      if (!Array.isArray(entries)) return;
       const now = Date.now();
       let scrubbedSensitiveEntry = false;
 
       for (const entry of entries) {
         // Older releases persisted signed SoundCloud URLs and DRM/OAuth material in store.json.
         // Never hydrate those values and rewrite the store without them.
-        if (entry.key.startsWith("soundcloud:stream:")) {
+        if (!entry || typeof entry.key !== "string" || !Number.isFinite(entry.createdAt) || !Number.isFinite(entry.expiresAt)) continue;
+        if (/^soundcloud:(stream:|track:|me-library:|collections|collection:)/.test(entry.key) || /^spotify:(search|collection)/.test(entry.key)) {
           scrubbedSensitiveEntry = true;
           continue;
         }
         if (entry.expiresAt > now) {
+          this.deleteEntry(entry.key);
           this.memoryCache.set(entry.key, entry);
+          const bytes = estimateBytes(entry.data) + Buffer.byteLength(entry.key, "utf8") + 128;
+          this.entryBytes.set(entry.key, bytes);
+          this.totalBytes += bytes;
         }
       }
+      const before = this.memoryCache.size;
+      this.evictStale(now);
+      if (before !== this.memoryCache.size) scrubbedSensitiveEntry = true;
       if (scrubbedSensitiveEntry) {
         this.dirty = true;
         this.revision += 1;
@@ -224,6 +288,33 @@ export class CacheStore {
       }
     } catch {
       // Hydration failure is fine on first run.
+    }
+  }
+
+  private async readLargeStore(storePath: string): Promise<CacheEntry[]> {
+    // The worker reads only the disposable metadata store and discards legacy sensitive entries.
+    const worker = new Worker(`
+      const { parentPort, workerData } = require("node:worker_threads");
+      const fs = require("node:fs");
+      try {
+        const entries = JSON.parse(fs.readFileSync(workerData.path, "utf8"));
+        if (!Array.isArray(entries)) throw new Error("Invalid cache");
+        const valid = entries.filter(e => e && typeof e.key === "string" && Number.isFinite(e.createdAt) && e.expiresAt > Date.now()
+          && !/^soundcloud:(stream:|track:|me-library:|collections|collection:)/.test(e.key) && !/^spotify:(search|collection)/.test(e.key))
+          .sort((a,b) => b.createdAt - a.createdAt).slice(0, workerData.limit).reverse();
+        parentPort.postMessage(valid);
+      } catch { parentPort.postMessage([]); }
+    `, { eval: true, workerData: { path: storePath, limit: MAX_ENTRIES } });
+    try {
+      return await new Promise<CacheEntry[]>((resolve, reject) => {
+        worker.once("message", resolve);
+        worker.once("error", reject);
+        worker.once("exit", () => reject(new Error("Cache hydration worker stopped before returning metadata")));
+      });
+    } finally {
+      await worker.terminate();
+      // Rewrite trimmed stores even if all retained entries are public and unexpired.
+      this.markDirty();
     }
   }
 }

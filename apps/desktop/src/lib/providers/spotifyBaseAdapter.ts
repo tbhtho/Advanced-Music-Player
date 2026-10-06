@@ -7,7 +7,7 @@ import type {
   TrackCollection
 } from "@amp/core";
 import type { ProviderConnection, UnifiedTrack } from "@amp/core";
-import { clampVolume } from "@amp/core";
+import { clampVolume, SharedRequests, abortableDelay } from "@amp/core";
 
 export interface SpotifyAdapterOptions {
   getConnection: () => ProviderConnection | undefined;
@@ -118,6 +118,9 @@ export abstract class SpotifyBaseAdapter implements PlaybackAdapter {
   protected artistAlbumsCache = new Map<string, CachedValue<SpotifyAlbumSummary[]>>();
   protected albumCache = new Map<string, CachedValue<SpotifyAlbumDetail>>();
   private rateLimitedUntil = 0;
+  private searchRequests = new SharedRequests<UnifiedTrack[]>();
+  private refreshPromise: Promise<ProviderConnection | undefined> | undefined;
+  private accountGeneration = 0;
   protected snapshot: PlaybackAdapterSnapshot = {
     provider: "spotify",
     status: "idle",
@@ -140,6 +143,9 @@ export abstract class SpotifyBaseAdapter implements PlaybackAdapter {
   }
 
   clearAccountCaches(): void {
+    this.accountGeneration++;
+    this.refreshPromise = undefined;
+    this.searchRequests.clear();
     this.searchCache.clear();
     this.collectionsCache = undefined;
     this.collectionTrackCache.clear();
@@ -158,22 +164,30 @@ export abstract class SpotifyBaseAdapter implements PlaybackAdapter {
 
   // ---- Data / library (engine-agnostic) ----
 
-  async search(query: string): Promise<UnifiedTrack[]> {
-    const cacheKey = query.trim().toLowerCase();
+  search(query: string, options?: { signal?: AbortSignal }): Promise<UnifiedTrack[]> {
+    const normalized = query.trim();
+    if (!normalized) return Promise.resolve([]);
+    const cacheKey = `${this.options.getConnection()?.accessToken ?? "disconnected"}:${normalized.toLowerCase()}`;
+    return this.searchRequests.run(cacheKey, (signal) => this.searchOnce(normalized, cacheKey, signal), options?.signal);
+  }
+
+  private async searchOnce(query: string, cacheKey: string, signal: AbortSignal): Promise<UnifiedTrack[]> {
+    signal.throwIfAborted();
     const cached = this.getCachedValue(this.searchCache, cacheKey);
     if (cached) {
       return cached;
     }
 
     const response = await this.request(
-      `/search?q=${encodeURIComponent(query)}&type=track&limit=18`
+      `/search?q=${encodeURIComponent(query)}&type=track&limit=18`, { signal }
     );
     if (!response.ok) {
-      throw await this.createSpotifyApiError(response, "Spotify search failed.");
+      throw await this.createSpotifyApiError(response, "Spotify search failed.", "catalog");
     }
 
     const json = (await response.json()) as { tracks?: { items?: SpotifyApiTrack[] } };
     const tracks = (json.tracks?.items ?? []).map(mapSpotifyApiTrack);
+    signal.throwIfAborted();
     this.setCachedValue(this.searchCache, cacheKey, tracks, SEARCH_CACHE_TTL_MS);
     return tracks;
   }
@@ -603,45 +617,56 @@ export abstract class SpotifyBaseAdapter implements PlaybackAdapter {
   // ---- Shared plumbing (used by data methods and by engine subclasses) ----
 
   protected async request(pathOrUrl: string, init: RequestInit = {}): Promise<Response> {
+    const generation = this.accountGeneration;
+    const ensureCurrentAccount = () => {
+      if (generation !== this.accountGeneration) throw new DOMException("Spotify account changed.", "AbortError");
+      init.signal?.throwIfAborted();
+    };
+    init.signal?.throwIfAborted();
     const cooldown = this.rateLimitedUntil - Date.now();
     if (cooldown > 0) {
-      await this.delay(cooldown);
+      await abortableDelay(cooldown, init.signal);
     }
     let token = await this.getAccessToken();
+    ensureCurrentAccount();
     if (!token) {
       throw new Error("Connect Spotify before requesting Spotify data.");
     }
 
     let response = await this.executeRequest(pathOrUrl, token, init);
+    ensureCurrentAccount();
     if (response.status === 401) {
-      const refreshed = await this.options.refreshConnection();
+      init.signal?.throwIfAborted();
+      const current = this.options.getConnection();
+      const refreshed = current?.accessToken && current.accessToken !== token ? current : await this.refreshConnection();
+      ensureCurrentAccount();
       if (!refreshed?.accessToken) {
         throw new Error("Spotify session expired.");
       }
 
       token = refreshed.accessToken;
       response = await this.executeRequest(pathOrUrl, refreshed.accessToken, init);
+      ensureCurrentAccount();
     }
 
     const method = (init.method ?? "GET").toUpperCase();
     if (response.status === 429 && (method === "GET" || method === "HEAD")) {
       const retryAfter = response.headers.get("retry-after");
-      const numericSeconds = Number(retryAfter);
+      const numericSeconds = retryAfter?.trim() ? Number(retryAfter) : Number.NaN;
       const dateDelay = retryAfter ? Date.parse(retryAfter) - Date.now() : Number.NaN;
-      const waitMs = Math.min(
-        30_000,
-        Math.max(
+      const waitMs = Math.max(
           1_000,
           Number.isFinite(numericSeconds)
             ? numericSeconds * 1_000
             : Number.isFinite(dateDelay)
               ? dateDelay
               : 5_000
-        )
       );
       this.rateLimitedUntil = Math.max(this.rateLimitedUntil, Date.now() + waitMs);
-      await this.delay(waitMs + Math.floor(Math.random() * 250));
+      await abortableDelay(waitMs + Math.floor(Math.random() * 250), init.signal);
+      ensureCurrentAccount();
       response = await this.executeRequest(pathOrUrl, token, init);
+      ensureCurrentAccount();
     }
 
     return response;
@@ -665,7 +690,7 @@ export abstract class SpotifyBaseAdapter implements PlaybackAdapter {
     return fetch(url.toString(), {
       ...init,
       headers,
-      signal: init.signal ?? AbortSignal.timeout(12_000)
+      signal: init.signal ? AbortSignal.any([init.signal, AbortSignal.timeout(12_000)]) : AbortSignal.timeout(12_000)
     });
   }
 
@@ -730,8 +755,17 @@ export abstract class SpotifyBaseAdapter implements PlaybackAdapter {
       return connection.accessToken;
     }
 
-    const refreshed = await this.options.refreshConnection();
+    const refreshed = await this.refreshConnection();
     return refreshed?.accessToken ?? connection?.accessToken;
+  }
+
+  private refreshConnection(): Promise<ProviderConnection | undefined> {
+    if (this.refreshPromise) return this.refreshPromise;
+    const pending = this.options.refreshConnection().finally(() => {
+      if (this.refreshPromise === pending) this.refreshPromise = undefined;
+    });
+    this.refreshPromise = pending;
+    return pending;
   }
 
   protected getCachedValue<T>(cache: Map<string, CachedValue<T>>, key: string): T | undefined {

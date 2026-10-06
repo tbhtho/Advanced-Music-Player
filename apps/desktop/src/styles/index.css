@@ -1,27 +1,28 @@
 @import "tailwindcss";
 /* Bundled Inter (variable) — the offline fallback for platforms without Apple's San Francisco. */
 @import "@fontsource-variable/inter";
-/* Schibsted Grotesk — the display voice: sharp, characterful, clearly not the body font. */
-@import "@fontsource-variable/schibsted-grotesk";
 
 :root {
   /* Surfaces — layered from the window shell up to raised cards. A little more separation between
      the steps than before gives the near-black UI real depth instead of reading as one flat slab. */
-  --shell: #0c0c0d;
-  --panel-strong: #161618;
-  --panel: #1d1d21;
-  --panel-soft: #26262b;
-  --paper: #f4f2ed;
-  --ink: #f4f2ed;
-  --muted: #a7a59f;
-  --faint: #74736e;
-  --edge: rgba(255, 255, 255, 0.06);
-  --edge-strong: rgba(255, 255, 255, 0.1);
+  --shell: #101012;
+  --panel-strong: #1b1b1e;
+  --panel: #202023;
+  --panel-soft: #29292d;
+  --panel-tint: #18181b;
+  --card-tint: var(--panel);
+  --bar-tint: var(--panel-strong);
+  --paper: #f4f4f5;
+  --ink: #f4f4f5;
+  --muted: #b0b0b6;
+  --faint: #a0a0a8;
+  --edge: rgba(255, 255, 255, 0.075);
+  --edge-strong: rgba(255, 255, 255, 0.13);
   --hairline: rgba(255, 255, 255, 0.055);
   /* Idle accent is monotone; the current song's artwork overrides --acid at runtime. */
-  --acid: #e8e4da;
+  --acid: #e8e8ec;
   /* Raw "r, g, b" of the current song's colour, for rgba() gradients. */
-  --song-rgb: 232, 228, 218;
+  --song-rgb: 232, 232, 236;
   --spotify: #a8a6a0;
   --soundcloud: #a8a6a0;
   --youtube: #a8a6a0;
@@ -38,10 +39,10 @@
 
   /* Corner radii — one consistent scale so cards, pills and inputs feel like one family.
      Deliberately tight: sharp corners read pro-audio, not bubbly. */
-  --radius-sm: 5px;
-  --radius: 8px;
-  --radius-lg: 11px;
-  --radius-xl: 14px;
+  --radius-sm: 6px;
+  --radius: 9px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
 
   /* Elevation — soft, diffused shadows tuned for near-black surfaces (hard shadows disappear here;
      these lean on a wide, low-opacity spread). --shadow-glow picks up the current song's colour. */
@@ -78,8 +79,16 @@
      so the UI looks the same everywhere and works offline. */
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter Variable", "Segoe UI",
     system-ui, sans-serif;
-  --font-display: "Schibsted Grotesk Variable", -apple-system, BlinkMacSystemFont,
+  --font-display: -apple-system, BlinkMacSystemFont,
     "SF Pro Display", "Inter Variable", "Segoe UI", system-ui, sans-serif;
+}
+
+/* One native window backdrop, with neutral tint and the user's own desktop behind it. */
+html[data-material="glass"] {
+  --shell: rgba(10, 10, 12, 0.82);
+  --panel-tint: rgba(18, 18, 21, 0.42);
+  --card-tint: rgba(34, 34, 38, 0.62);
+  --bar-tint: rgba(25, 25, 29, 0.78);
 }
 
 html,
@@ -214,7 +223,7 @@ button:disabled,
 .kicker {
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
   color: var(--muted);
 }
@@ -224,7 +233,7 @@ button:disabled,
 .surface {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0) 38%),
-    var(--panel);
+    var(--card-tint);
   border: 1px solid var(--edge);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-md);
@@ -243,25 +252,16 @@ button:disabled,
   box-shadow: var(--shadow-lg);
 }
 
-/* ---- Surfaces: classic flat panels (no glass/blur/translucency). These class names are kept so the
-   components don't need touching, but they now render as solid opaque surfaces. ---- */
-.vibrancy {
-  /* No backdrop blur — classic flat look. */
-}
+/* Native material is applied once to the window; panels add only tint and a faint top highlight. */
 .glass-panel {
-  /* Translucent panel with a whisper of top-light. Being see-through lets the app root's single
-     top-left song wash show THROUGH the sidebar and Now Playing rail — so the glow reads as one
-     continuous sky across all three columns, with just one cheap gradient paint (no per-panel
-     gradient, no background-attachment: fixed, which forced full-window repaints and made the UI
-     lag). The panel tint stays high enough that text/controls keep full contrast. */
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0) 30%),
-    rgba(20, 20, 23, 0.74);
+    var(--panel-tint);
 }
 .glass-bar {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.022), rgba(255, 255, 255, 0) 26%),
-    var(--panel-strong);
+    var(--bar-tint);
 }
 .glass-popover {
   background: var(--panel-strong);

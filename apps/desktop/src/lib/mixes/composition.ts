@@ -407,6 +407,17 @@ export function pickBestTwin(
   let best: UnifiedTrack | undefined;
   let bestScore = -Infinity;
   for (const candidate of candidates) {
+    // A same-title upload by another artist scored 3 + 1 for duration and passed the old 3.5
+    // threshold. Artist-only fallback also accepted a completely different recording.
+    const title = normalizeTitle(candidate.title);
+    const seedTitle = normalizeTitle(seed.title);
+    const artist = normalizeArtist(primaryArtist(candidate));
+    const seedArtist = normalizeArtist(primaryArtist(seed));
+    if (!seedTitle || !seedArtist || seedArtist === "unknown" || artist !== seedArtist) continue;
+    if (title !== seedTitle && !title.startsWith(seedTitle + " ")) continue;
+    const versions = (value: string) => (value.toLowerCase().match(/\b(remix|cover|live|acoustic|instrumental|nightcore|slowed|sped\s*up)\b/g) ?? []).sort().join("|");
+    if (versions(seed.title) !== versions(candidate.title)) continue;
+    if (seed.durationMs > 0 && candidate.durationMs > 0 && Math.abs(candidate.durationMs - seed.durationMs) > Math.max(12_000, seed.durationMs * 0.1)) continue;
     const score = scoreTwinMatch(seed, candidate);
     if (score > bestScore) {
       bestScore = score;
@@ -473,7 +484,14 @@ export function scoreStationCandidate(track: UnifiedTrack, signals: StationSigna
   const key = trackKey(track);
   const artist = normalizeArtist(primaryArtist(track));
   const seedArtist = normalizeArtist(primaryArtist(signals.seed));
+  const seedGenres = signals.seedGenres ?? toGenreSet(signals.seed.genre);
+  const candGenres = signals.candidateGenres?.get(key) ?? toGenreSet(track.genre);
+  const genreOverlap = [...candGenres].some((genre) => seedGenres.has(genre));
+  const hasProvenance = signals.hop1Keys.has(key) || signals.hop2Keys.has(key) || signals.neighbourArtistWeight.has(artist) || artist === seedArtist;
+  if (!hasProvenance && !genreOverlap) return -Infinity;
+  // Familiarity and similar duration are refinements, never evidence of musical relevance.
   let score = 0;
+  if (!hasProvenance) score -= 0.75;
 
   if (signals.hop1Keys.has(key)) {
     score += 3;
@@ -492,8 +510,7 @@ export function scoreStationCandidate(track: UnifiedTrack, signals: StationSigna
   // Genre: reward overlap, softly penalize a mismatch. A soft penalty (not a hard gate) is what
   // keeps a "balanced" station mostly in-lane while still allowing the occasional adjacent-genre
   // left turn — versus the old +1 tiebreaker that a wrong-genre related track easily out-scored.
-  const seedGenres = signals.seedGenres ?? toGenreSet(signals.seed.genre);
-  const candGenres = signals.candidateGenres?.get(key) ?? toGenreSet(track.genre);
+  const genreMismatch = seedGenres.size > 0 && candGenres.size > 0 && ![...candGenres].some((genre) => seedGenres.has(genre));
   if (seedGenres.size > 0 && candGenres.size > 0) {
     const overlaps = [...candGenres].some((genre) => seedGenres.has(genre));
     score += overlaps ? 1.5 : -1.5;
@@ -515,7 +532,10 @@ export function scoreStationCandidate(track: UnifiedTrack, signals: StationSigna
   const seedFeature = signals.seedFeature;
   const candFeature = signals.candidateFeatures?.get(key);
   if (seedFeature?.bpm != null && candFeature?.bpm != null) {
-    score -= Math.min(Math.abs(candFeature.bpm - seedFeature.bpm) / 60, 1) * 1.5;
+    // Half/double-time annotations commonly describe the same feel (70 vs 140 bpm).
+    const tempoDistance = Math.min(...[0.5, 1, 2].map((scale) => Math.abs(candFeature.bpm! * scale - seedFeature.bpm!)));
+    if (genreMismatch && tempoDistance > 35) return -Infinity;
+    score -= Math.min(tempoDistance / 60, 1) * 1.5;
     if (seedFeature.loudness != null && candFeature.loudness != null) {
       score -= Math.min(Math.abs(candFeature.loudness - seedFeature.loudness) / 6, 1) * 0.5;
     }
@@ -543,8 +563,10 @@ export function orderStationTracks(
   const pool = candidates.map((track) => ({
     track,
     base: scores.get(trackKey(track)) ?? 0,
-    jitter: rand()
+    jitter: rand(),
+    artist: normalizeArtist(primaryArtist(track))
   }));
+  const providerPlays = new Map<Provider, number>();
   const artistPlays = new Map<string, number>();
   const out: UnifiedTrack[] = [];
   let lastArtist: string | undefined;
@@ -559,12 +581,10 @@ export function orderStationTracks(
     if (out.length >= 2) {
       const pooledProviders = new Set(pool.map((item) => item.track.provider));
       if (pooledProviders.size > 1) {
-        const placed = new Map<Provider, number>();
-        for (const track of out) {
-          placed.set(track.provider, (placed.get(track.provider) ?? 0) + 1);
-        }
+        const bestRemaining = Math.max(...pool.map((item) => item.base));
         for (const provider of pooledProviders) {
-          if ((placed.get(provider) ?? 0) < Math.floor(out.length * 0.3)) {
+          const bestProvider = Math.max(...pool.filter((item) => item.track.provider === provider).map((item) => item.base));
+          if ((providerPlays.get(provider) ?? 0) < Math.floor(out.length * 0.3) && bestProvider >= bestRemaining - 1.5) {
             forcedProvider = provider;
             break;
           }
@@ -574,8 +594,7 @@ export function orderStationTracks(
     let bestIndex = -1;
     let bestValue = -Infinity;
     for (let i = 0; i < pool.length; i += 1) {
-      const { track, base, jitter } = pool[i];
-      const artist = normalizeArtist(primaryArtist(track));
+      const { track, base, jitter, artist } = pool[i];
       if (artist === lastArtist && pool.length > 1) {
         continue;
       }
@@ -583,7 +602,7 @@ export function orderStationTracks(
         continue;
       }
       const plays = artistPlays.get(artist) ?? 0;
-      let value = base * Math.pow(0.55, plays) + jitter * 1.1;
+      let value = base - plays * 0.65 + jitter * 0.15;
       if (lastProvider && providerStreak >= 3 && track.provider !== lastProvider) {
         value += 0.5;
       }
@@ -596,6 +615,7 @@ export function orderStationTracks(
       bestIndex = 0;
     }
     const picked = pool.splice(bestIndex, 1)[0].track;
+    providerPlays.set(picked.provider, (providerPlays.get(picked.provider) ?? 0) + 1);
     const artist = normalizeArtist(primaryArtist(picked));
     artistPlays.set(artist, (artistPlays.get(artist) ?? 0) + 1);
     providerStreak = picked.provider === lastProvider ? providerStreak + 1 : 1;

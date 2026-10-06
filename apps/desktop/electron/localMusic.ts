@@ -2,6 +2,7 @@ import type { UnifiedTrack } from "@amp/core";
 import { createHash } from "node:crypto";
 import { promises as fs, realpathSync } from "node:fs";
 import path from "node:path";
+import { Worker } from "node:worker_threads";
 
 /*
  * Local music: scan user-configured folders for audio files, read tags + embedded artwork with
@@ -15,6 +16,15 @@ const AUDIO_EXTENSIONS = new Set([
 ]);
 const MAX_SCAN_DEPTH = 8;
 const MAX_ARTWORK_BYTES = 8 * 1024 * 1024;
+const MAX_METADATA_ENTRIES = 5000;
+
+interface CachedLocalMetadata {
+  size: number;
+  mtimeMs: number;
+  ctimeMs: number;
+  track: UnifiedTrack;
+  artworkPath?: string;
+}
 
 export interface LocalTrackFile {
   /** Stable id = sha1 of the absolute path; also the amp-local:// key. */
@@ -33,15 +43,34 @@ export class LocalMusicManager {
   private loaded = false;
   private folderMutation: Promise<void> = Promise.resolve();
   private scanGeneration = 0;
+  private initialization: Promise<void> | undefined;
+  private scanPromise: Promise<UnifiedTrack[]> | undefined;
+  private metadataCachePath: string;
+  private metadataCache = new Map<string, CachedLocalMetadata>();
+  private metadataDirty = false;
 
   constructor(userDataPath: string) {
     this.configPath = path.join(userDataPath, "local-music.json");
     this.artworkDir = path.join(userDataPath, "local-artwork");
+    this.metadataCachePath = path.join(userDataPath, "local-metadata.json");
   }
 
-  async initialize(): Promise<void> {
-    await fs.mkdir(this.artworkDir, { recursive: true }).catch(() => undefined);
-    await this.loadConfig();
+  initialize(): Promise<void> {
+    this.initialization ??= (async () => {
+      await fs.mkdir(this.artworkDir, { recursive: true }).catch(() => undefined);
+      await this.loadConfig();
+      try {
+        if ((await fs.stat(this.metadataCachePath)).size > 8 * 1024 * 1024) return;
+        const parsed = JSON.parse(await fs.readFile(this.metadataCachePath, "utf8"));
+        if (parsed.version !== 1 || !Array.isArray(parsed.entries)) return;
+        for (const [file, entry] of parsed.entries.slice(-MAX_METADATA_ENTRIES)) {
+          if (typeof file === "string" && entry?.track?.provider === "local" && entry.track.id === hashPath(file) && entry.track.providerTrackId === entry.track.id && Array.isArray(entry.track.creators) && entry.track.creators.every((artist: unknown) => typeof artist === "string") && typeof entry.track.title === "string" && Number.isFinite(entry.size) && Number.isFinite(entry.mtimeMs) && Number.isFinite(entry.ctimeMs) && (!entry.artworkPath || (typeof entry.artworkPath === "string" && isInside(this.artworkDir, entry.artworkPath)))) {
+            this.metadataCache.set(file, entry);
+          } else this.metadataDirty = true;
+        }
+      } catch { /* First run or disposable cache corruption. */ }
+    })();
+    return this.initialization;
   }
 
   private async loadConfig(): Promise<void> {
@@ -85,12 +114,12 @@ export class LocalMusicManager {
   }
 
   async getFolders(): Promise<string[]> {
-    await this.loadConfig();
+    await this.initialize();
     return [...this.folders];
   }
 
   async addFolder(folder: string): Promise<string[]> {
-    await this.loadConfig();
+    await this.initialize();
     const normalized = path.resolve(folder);
     return this.updateFolders((folders) =>
       folders.includes(normalized) ? folders : [...folders, normalized]
@@ -98,7 +127,7 @@ export class LocalMusicManager {
   }
 
   async removeFolder(folder: string): Promise<string[]> {
-    await this.loadConfig();
+    await this.initialize();
     const normalized = path.resolve(folder);
     return this.updateFolders((folders) => folders.filter((candidate) => candidate !== normalized));
   }
@@ -133,13 +162,23 @@ export class LocalMusicManager {
       return undefined;
     }
     // Artwork lives in our own cache dir — safe to serve as long as the track id is known.
-    return isInside(this.artworkDir, entry.artworkPath) ? entry.artworkPath : undefined;
+    try {
+      return isInside(realpathSync(this.artworkDir), realpathSync(entry.artworkPath)) ? entry.artworkPath : undefined;
+    } catch { return undefined; }
   }
 
   /** Walk every configured folder, parse tags, and return UnifiedTracks (rebuilds the id index). */
-  async scan(): Promise<UnifiedTrack[]> {
-    await this.loadConfig();
-    const mm = await import("music-metadata");
+  scan(): Promise<UnifiedTrack[]> {
+    if (this.scanPromise) return this.scanPromise;
+    const pending = this.scanInner().finally(() => {
+      if (this.scanPromise === pending) this.scanPromise = undefined;
+    });
+    this.scanPromise = pending;
+    return pending;
+  }
+
+  private async scanInner(): Promise<UnifiedTrack[]> {
+    await this.initialize();
     const generation = ++this.scanGeneration;
     const folders = [...this.folders];
     const nextIndex = new Map<string, LocalTrackFile>();
@@ -163,16 +202,67 @@ export class LocalMusicManager {
       }
     }
 
+    let metadataWorker: Worker | undefined;
+    let jobId = 0;
+    const pendingMetadata = new Map<number, { resolve: (metadata: import("music-metadata").IAudioMetadata) => void; reject: (error: Error) => void }>();
+    const parseMetadata = (file: string): Promise<import("music-metadata").IAudioMetadata> => {
+      if (!metadataWorker) {
+        // Importing the parser on the main thread can stall the first Library scan for >1s.
+        // A disposable worker keeps tag parsing and its dependency graph off the UI/IPC thread.
+        metadataWorker = new Worker(`
+          const { parentPort, workerData } = require("node:worker_threads");
+          const modulePromise = import(workerData.moduleUrl);
+          parentPort.on("message", async ({ id, file }) => {
+            try {
+              const mm = await modulePromise;
+              const metadata = await mm.parseFile(file, { duration: true, skipCovers: false });
+              const { title, artists, artist, albumartist, album, genre } = metadata.common;
+              const picture = metadata.common.picture?.[0];
+              const usable = picture?.data?.length <= workerData.maxArtwork ? picture : undefined;
+              parentPort.postMessage({ id, metadata: { format: { duration: metadata.format.duration }, common: { title, artists, artist, albumartist, album, genre, picture: usable ? [usable] : undefined } } });
+            } catch { parentPort.postMessage({ id, error: "Local metadata could not be read" }); }
+          });
+        `, { eval: true, workerData: { moduleUrl: import.meta.resolve("music-metadata"), maxArtwork: MAX_ARTWORK_BYTES } });
+        metadataWorker.on("message", ({ id, metadata, error }) => {
+          const job = pendingMetadata.get(id);
+          pendingMetadata.delete(id);
+          if (error) job?.reject(new Error(error)); else job?.resolve(metadata);
+        });
+        const fail = () => {
+          for (const job of pendingMetadata.values()) job.reject(new Error("Metadata worker stopped"));
+          pendingMetadata.clear();
+        };
+        metadataWorker.on("error", fail);
+        metadataWorker.on("exit", fail);
+      }
+      return new Promise((resolve, reject) => {
+        const id = ++jobId;
+        pendingMetadata.set(id, { resolve, reject });
+        metadataWorker!.postMessage({ id, file });
+      });
+    };
     let cursor = 0;
     const workers = Array.from({ length: Math.min(6, files.length) }, async () => {
       while (cursor < files.length) {
         const absolutePath = files[cursor++];
         const id = hashPath(absolutePath);
         try {
-          const metadata = await mm.parseFile(absolutePath, { duration: true, skipCovers: false });
+          const stat = await fs.stat(absolutePath);
+          const cached = this.metadataCache.get(absolutePath);
+          if (cached && cached.size === stat.size && cached.mtimeMs === stat.mtimeMs && cached.ctimeMs === stat.ctimeMs && (!cached.artworkPath || await fs.access(cached.artworkPath).then(() => true, () => false))) {
+            nextIndex.set(id, { id, absolutePath, artworkPath: cached.artworkPath });
+            tracks.push({ ...cached.track });
+            continue;
+          }
+          const metadata = await parseMetadata(absolutePath);
           const artworkPath = await this.cacheArtwork(id, metadata.common.picture?.[0]);
           nextIndex.set(id, { id, absolutePath, artworkPath });
-          tracks.push(buildLocalTrack(id, absolutePath, metadata, Boolean(artworkPath)));
+          const track = buildLocalTrack(id, absolutePath, metadata, Boolean(artworkPath));
+          tracks.push(track);
+          this.metadataCache.delete(absolutePath);
+          this.metadataCache.set(absolutePath, { size: stat.size, mtimeMs: stat.mtimeMs, ctimeMs: stat.ctimeMs, track, artworkPath });
+          this.metadataDirty = true;
+          if (this.metadataCache.size > MAX_METADATA_ENTRIES) this.metadataCache.delete(this.metadataCache.keys().next().value!);
         } catch {
           // Unreadable/corrupt/unsupported-codec file: still list it by filename so it's visible,
           // but mark it so a play attempt can fail honestly.
@@ -181,15 +271,20 @@ export class LocalMusicManager {
         }
       }
     });
-    await Promise.all(workers);
+    try { await Promise.all(workers); }
+    finally { if (metadataWorker) await metadataWorker.terminate(); }
 
     // A folder was added or removed while metadata parsing was in flight. Restart from the current
     // configuration so neither the main-process index nor the renderer receives an obsolete scan.
     if (generation !== this.scanGeneration) {
-      return this.scan();
+      return this.scanInner();
     }
 
     this.index = nextIndex;
+    for (const file of this.metadataCache.keys()) if (!seenFiles.has(file)) {
+      this.metadataCache.delete(file);
+      this.metadataDirty = true;
+    }
     const retainedArtwork = new Set(
       [...nextIndex.values()].flatMap((entry) => (entry.artworkPath ? [path.resolve(entry.artworkPath)] : []))
     );
@@ -204,6 +299,13 @@ export class LocalMusicManager {
     );
     // Alphabetical by title keeps the Library list stable across rescans.
     tracks.sort((a, b) => a.title.localeCompare(b.title));
+    if (this.metadataDirty) {
+      const tempPath = `${this.metadataCachePath}.${process.pid}.tmp`;
+      await fs.writeFile(tempPath, JSON.stringify({ version: 1, entries: [...this.metadataCache] }), "utf8")
+        .then(() => fs.rename(tempPath, this.metadataCachePath))
+        .then(() => { this.metadataDirty = false; })
+        .catch(() => fs.rm(tempPath, { force: true }).catch(() => undefined));
+    }
     return tracks;
   }
 

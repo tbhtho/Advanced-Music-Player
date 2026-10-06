@@ -597,7 +597,7 @@ export function App() {
           className="pointer-events-none fixed inset-0 -z-10 transition-[background] duration-700"
           style={{
             background:
-              "radial-gradient(150% 105% at 0% -12%, rgba(var(--song-rgb), 0.26), rgba(var(--song-rgb), 0.1) 46%, transparent 78%)"
+              "radial-gradient(150% 105% at 0% -12%, rgba(var(--song-rgb), 0.12), rgba(var(--song-rgb), 0.035) 46%, transparent 78%)"
           }}
         />
         <div
@@ -611,8 +611,7 @@ export function App() {
             opacity:
               "calc((var(--beat, 0) * 0.5 + var(--energy, 0) * 0.2) * var(--beat-intensity, 1))",
             transform: "scale(calc(1 + var(--beat, 0) * 0.04 * var(--beat-intensity, 1)))",
-            transformOrigin: "0% 0%",
-            willChange: "opacity, transform"
+            transformOrigin: "0% 0%"
           }}
         />
         <DesktopTitleBar visible={showCustomChrome} />
