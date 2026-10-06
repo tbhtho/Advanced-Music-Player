@@ -19,16 +19,24 @@
     "dist": "corepack pnpm --filter @amp/desktop dist"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["electron", "electron-winstaller"],
+    "onlyBuiltDependencies": [
+      "electron",
+      "electron-winstaller"
+    ],
     "overrides": {
-      "brace-expansion": "^5.0.6",
+      "brace-expansion": "^5.0.12",
       "dmg-builder": "26.15.3",
       "electron-builder-squirrel-windows": "26.15.3",
       "form-data": "^4.0.6",
-      "js-yaml": "^4.2.0",
-      "tar": "^7.5.16",
+      "js-yaml": "^4.3.2",
+      "tar": "^7.5.21",
       "tmp": "^0.2.6",
-      "undici": "^6.27.0"
+      "undici": "^6.28.1",
+      "fast-uri": "^3.1.8",
+      "postcss": "^8.5.23",
+      "source-map-js": "^1.2.2",
+      "@xmldom/xmldom": "^0.8.15",
+      "@electron/get@<5.0.0": "^5.1.0"
     }
   }
 }

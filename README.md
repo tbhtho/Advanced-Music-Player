@@ -2,7 +2,7 @@
   <img src="apps/desktop/build/icon.png" width="112" alt="AMP play-button icon">
 </p>
 
-# AMP — Advanced Music Player
+# AMP - Advanced Music Player
 
 [![CI](https://github.com/tbhtho/Advanced-Music-Player/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/tbhtho/Advanced-Music-Player/actions/workflows/ci.yml)
 [![License: not declared](https://img.shields.io/badge/License-not_declared-lightgrey.svg)](#license)
@@ -26,12 +26,14 @@ See [provider setup and playback notes](docs/PROVIDER-NOTES.md) for account setu
 
 ## Features
 
-- Search Spotify, SoundCloud, and YouTube together.
-- Mix online tracks and local MP3, M4A, FLAC, WAV, and OGG files in playlists.
-- Save likes on Spotify and SoundCloud from search, lists, playlists, or the player.
-- Discover song-seeded radio and daily mixes, with artist and album pages and mood or genre filters.
-- See listening stats recorded on this device.
-- Download eligible SoundCloud audio and optionally show Discord Rich Presence.
+- Unified search across Spotify, SoundCloud and YouTube (SoundCloud + YouTube work without signing in)
+- Play your own local audio files (mp3, m4a, flac, wav, ogg…) alongside everything else
+- One library and playlists that freely mix every source
+- Like/save on Spotify and SoundCloud, everywhere - player bar, lists, search, playlists
+- Song-seeded radio and daily mixes, scored by tempo / genre / vibe
+- Artist and album pages, mood + genre filters, on-device listening stats
+- SoundCloud audio downloads for eligible tracks, optional Discord Rich Presence
+- Windows audio-reactive gradient (beat-synced)
 
 ## Playback notes
 

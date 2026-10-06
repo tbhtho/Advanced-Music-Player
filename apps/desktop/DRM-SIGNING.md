@@ -49,7 +49,7 @@ Requirements:
   override with `AMP_EVS_PYTHON=<path>`).
 - The `castlabs-evs` pip package importable as `castlabs_evs`.
 - The app must use the castLabs Electron fork (it already does:
-  `electron: https://github.com/castlabs/electron-releases#v41.1.1+wvcus`).
+  `electron: https://github.com/castlabs/electron-releases#v41.10.7+wvcus`).
 
 ---
 
