@@ -142,13 +142,15 @@ export class LocalMusicManager {
     }
     let realFile: string;
     try {
-      realFile = realpathSync(entry.absolutePath);
+      realFile = realpathSync.native(entry.absolutePath);
     } catch {
       return undefined;
     }
     const insideAFolder = this.folders.some((folder) => {
       try {
-        return isInside(realpathSync(folder), realFile);
+        // Match the native canonicalization used by fs.promises.realpath during scans.
+        // Windows 8.3 aliases otherwise make the same configured folder look unrelated.
+        return isInside(realpathSync.native(folder), realFile);
       } catch {
         return false;
       }
@@ -163,7 +165,7 @@ export class LocalMusicManager {
     }
     // Artwork lives in our own cache dir — safe to serve as long as the track id is known.
     try {
-      return isInside(realpathSync(this.artworkDir), realpathSync(entry.artworkPath)) ? entry.artworkPath : undefined;
+      return isInside(realpathSync.native(this.artworkDir), realpathSync.native(entry.artworkPath)) ? entry.artworkPath : undefined;
     } catch { return undefined; }
   }
 

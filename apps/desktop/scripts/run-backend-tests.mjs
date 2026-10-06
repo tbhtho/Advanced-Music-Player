@@ -1,7 +1,7 @@
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
-import { mkdtemp, mkdir, readFile, writeFile, rm, stat } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, writeFile, rm, stat, realpath, symlink, unlink } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { backendModule, delay, fixtureTrack, wireResponse } from "./backend-fixtures.mjs";
@@ -436,10 +436,28 @@ test("local scans reuse unchanged metadata across restarts, refresh modified fil
   const longer = Buffer.concat([wav, Buffer.alloc(8000)]); longer.writeUInt32LE(longer.length - 8, 4); longer.writeUInt32LE(16000, 40);
   await writeFile(path.join(folder, "Fixture.wav"), longer);
   assert.equal((await restarted.scan())[0].durationMs, 2000);
-  assert.equal(restarted.resolveAudioPath(first[0].id), path.join(folder, "Fixture.wav"));
+  assert.equal(restarted.resolveAudioPath(first[0].id), await realpath(path.join(folder, "Fixture.wav")));
   await restarted.removeFolder(folder);
   assert.deepEqual(await restarted.scan(), []);
   assert.equal(restarted.resolveAudioPath(first[0].id), undefined);
+});
+
+test("local audio resolves configured directory aliases and rejects an alias retargeted outside its scanned folder", async () => {
+  const directory = path.join(root, `local-alias-${nextDirectory++}`);
+  const folder = path.join(directory, "music"), other = path.join(directory, "other");
+  const alias = path.join(directory, "configured-folder");
+  await mkdir(folder, { recursive: true });
+  await mkdir(other, { recursive: true });
+  await writeFile(path.join(folder, "Fixture.mp3"), "Fixture metadata is intentionally unreadable");
+  await symlink(folder, alias, process.platform === "win32" ? "junction" : "dir");
+  const manager = new LocalMusicManager(directory);
+  await manager.addFolder(alias);
+  const tracks = await manager.scan();
+  assert.equal(tracks.length, 1);
+  assert.equal(manager.resolveAudioPath(tracks[0].id), await realpath(path.join(folder, "Fixture.mp3")));
+  await unlink(alias);
+  await symlink(other, alias, process.platform === "win32" ? "junction" : "dir");
+  assert.equal(manager.resolveAudioPath(tracks[0].id), undefined);
 });
 
 test("native glass respects OS support, high contrast and reduced transparency", () => {
