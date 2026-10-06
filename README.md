@@ -4,6 +4,10 @@
 
 # AMP — Advanced Music Player
 
+[![CI](https://github.com/tbhtho/Advanced-Music-Player/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/tbhtho/Advanced-Music-Player/actions/workflows/ci.yml)
+[![License: not declared](https://img.shields.io/badge/License-not_declared-lightgrey.svg)](#license)
+![Platform](https://img.shields.io/badge/platform-Windows-blue.svg)
+
 Spotify, SoundCloud, YouTube, and your local music in one library, with mixed playlists and a single queue.
 
 ## Get AMP
@@ -41,3 +45,7 @@ AMP is a personal project. Use only content you are entitled to access, follow t
 - [Development and packaging](docs/DEVELOPMENT.md)
 - [Release workflow](RELEASING.md)
 - [SoundCloud DRM signing](apps/desktop/DRM-SIGNING.md)
+
+## License
+
+No repository-wide license is declared in this checkout. Source access does not establish redistribution permission; retain provider terms and third-party notices.
