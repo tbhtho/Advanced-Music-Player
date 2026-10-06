@@ -2,7 +2,11 @@
 
 ## Spotify
 
-Provide your own Spotify client ID in Settings, with the redirect URI:
+Windows releases include AMP's registered public Spotify client ID, so sign-in does not require
+entering an identifier. The application is in development mode: the app owner must have Premium,
+and users must be on the app's allowlist. See [Spotify's current quota rules](https://developer.spotify.com/documentation/web-api/concepts/quota-modes).
+
+You can still provide your own registered public client ID in advanced Settings, with the redirect URI:
 
 ```text
 http://127.0.0.1:8000/spotify/callback

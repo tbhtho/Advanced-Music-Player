@@ -12,7 +12,7 @@ Spotify, SoundCloud, YouTube, and your local music in one library, with mixed pl
 
 ## Get AMP
 
-**Windows:** [Download AMP 0.3.5](https://github.com/tbhtho/Advanced-Music-Player/releases/download/v0.3.5/AMP.Setup.0.3.5.exe) · [Release notes and checksums](https://github.com/tbhtho/Advanced-Music-Player/releases/tag/v0.3.5).
+**Windows:** [Download AMP 0.3.6](https://github.com/tbhtho/Advanced-Music-Player/releases/download/v0.3.6/AMP.Setup.0.3.6.exe) · [Release notes and checksums](https://github.com/tbhtho/Advanced-Music-Player/releases/tag/v0.3.6).
 
 The installer uses production castLabs VMP signing. Windows publisher signing is not configured, so SmartScreen may show a warning. To run the current source, follow the [development setup](docs/DEVELOPMENT.md).
 
@@ -33,7 +33,7 @@ Screenshots show the released 0.3.5 interface with sample tracks, playlists and 
 ## Quick start
 
 1. Launch AMP and open **Settings** to connect the providers you want to use.
-2. Search SoundCloud and YouTube without signing in, or connect Spotify with your own client ID. Spotify playback requires Premium.
+2. Search SoundCloud and YouTube without signing in, or connect Spotify using AMP's bundled public app configuration. Spotify development-mode access requires an eligible, allowlisted account; playback requires Premium.
 3. Add tracks or your own audio files to the library, mix them into playlists, and play them from one queue.
 
 See [provider setup and playback notes](docs/PROVIDER-NOTES.md) for account setup, browser-session handling, and provider limits.
