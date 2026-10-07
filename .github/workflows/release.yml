@@ -121,11 +121,19 @@ jobs:
         shell: bash
         run: ls -la apps/desktop/dist
 
+      - name: Verify update metadata and hash release assets
+        shell: bash
+        run: node apps/desktop/scripts/verify-update-release.mjs apps/desktop/dist
+
       - name: Upload installer artifact
         uses: actions/upload-artifact@v7
         with:
           name: amp-windows-installer
-          path: apps/desktop/dist/*.exe
+          path: |
+            apps/desktop/dist/*.exe
+            apps/desktop/dist/*.exe.blockmap
+            apps/desktop/dist/latest.yml
+            apps/desktop/dist/SHA256SUMS.txt
           if-no-files-found: error
 
       - name: Draft GitHub release
@@ -140,7 +148,7 @@ jobs:
               echo "::error::Release ${GITHUB_REF_NAME} is already published; refusing to replace its assets." >&2
               exit 1
             fi
-            gh release upload "${GITHUB_REF_NAME}" apps/desktop/dist/*.exe --clobber
+            gh release upload "${GITHUB_REF_NAME}" apps/desktop/dist/*.exe apps/desktop/dist/*.exe.blockmap apps/desktop/dist/latest.yml apps/desktop/dist/SHA256SUMS.txt --clobber
             exit 0
           fi
 
@@ -149,4 +157,4 @@ jobs:
             --draft \
             --title "AMP ${GITHUB_REF_NAME}" \
             --generate-notes \
-            apps/desktop/dist/*.exe
+            apps/desktop/dist/*.exe apps/desktop/dist/*.exe.blockmap apps/desktop/dist/latest.yml apps/desktop/dist/SHA256SUMS.txt

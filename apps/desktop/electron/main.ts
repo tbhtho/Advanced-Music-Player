@@ -17,6 +17,8 @@ import {
   shell,
   Tray
 } from "electron";
+import electronUpdater from "electron-updater";
+import { AppUpdates } from "./appUpdates.js";
 import { createHash, randomBytes } from "node:crypto";
 import { execFile, spawn, type ChildProcess } from "node:child_process";
 import { appendFileSync, cpSync, existsSync, mkdirSync, promises as fs, statSync, writeFileSync } from "node:fs";
@@ -3960,6 +3962,23 @@ app.on("open-url", (event, rawUrl) => {
 let widevineReady = false;
 let widevineStatusText = "";
 
+let appUpdates: AppUpdates | undefined;
+function initializeAppUpdates() {
+  const engine=app.isPackaged && process.platform==="win32" ? electronUpdater.autoUpdater : undefined;
+  if(engine){
+    engine.logger=null;
+    engine.setFeedURL({provider:"github",owner:"tbhtho",repo:"Advanced-Music-Player",private:false,releaseType:"release"});
+  }
+  appUpdates=new AppUpdates(engine,app.getVersion(),state=>{
+    if(mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isDestroyed()) mainWindow.webContents.send("spot-cloud:update-state",state);
+  },async()=>{
+    if(!mainWindow || mainWindow.isDestroyed())return false;
+    const result=await dialog.showMessageBox(mainWindow,{type:"question",title:"Update AMP",message:"Restart AMP and install the downloaded update?",detail:"Playback will stop while the installer runs. Your library and account settings will be kept.",buttons:["Cancel","Restart and update"],defaultId:0,cancelId:0,noLink:true});
+    return result.response===1;
+  });
+  appUpdates.start();
+}
+
 app.whenReady().then(async () => {
   logStartup("app:whenReady");
   if (usesCustomWindowChrome()) {
@@ -3967,6 +3986,7 @@ app.whenReady().then(async () => {
   }
   registerCustomProtocolClient();
   await initializeEnv();
+  initializeAppUpdates();
 
   // Construct the gateway and start warming it (cache hydrate + SoundCloud asset-bundle scrape) in
   // the BACKGROUND. Awaiting it here used to delay the window by the full scrape ("takes a minute
@@ -4051,6 +4071,7 @@ app.whenReady().then(async () => {
 app.on("before-quit", () => {
   // Any path that genuinely quits (OS shutdown, installer, Cmd+Q) must bypass close-to-tray.
   isQuitting = true;
+  appUpdates?.dispose();
   discordPresence.stop();
   globalShortcut.unregisterAll();
   stopYouTubePlayerServer();
@@ -4102,6 +4123,10 @@ function assertOAuthProvider(value: unknown): asserts value is Provider {
 }
 
 handleTrustedIpc("spot-cloud:get-runtime-info", async () => buildRuntimeInfo());
+handleTrustedIpc("spot-cloud:update-get-state", () => appUpdates?.getState());
+handleTrustedIpc("spot-cloud:update-check", () => appUpdates?.check());
+handleTrustedIpc("spot-cloud:update-download", () => appUpdates?.download());
+handleTrustedIpc("spot-cloud:update-install", () => appUpdates?.install() ?? false);
 
 handleTrustedIpc("spot-cloud:get-widevine-status", async () => ({
   ready: widevineReady,

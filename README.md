@@ -6,7 +6,7 @@
 
 One library and playback queue for Spotify, SoundCloud and your own music.
 
-**[Download AMP 0.3.7 for Windows](https://github.com/tbhtho/Advanced-Music-Player/releases/download/v0.3.7/AMP.Setup.0.3.7.exe)** · [Release notes and checksums](https://github.com/tbhtho/Advanced-Music-Player/releases/tag/v0.3.7)
+**[Download AMP 0.3.8 for Windows](https://github.com/tbhtho/Advanced-Music-Player/releases/download/v0.3.8/AMP.Setup.0.3.8.exe)** · [Release notes and checksums](https://github.com/tbhtho/Advanced-Music-Player/releases/tag/v0.3.8)
 
 <p align="center">
   <a href="assets/screenshots/library-0.3.7.png"><img src="assets/screenshots/library-0.3.7.png" width="960" alt="AMP 0.3.7 showing a combined Spotify and SoundCloud Library, a mixed queue and continuous glass surfaces"></a><br>
@@ -32,9 +32,11 @@ These are real frontend captures using sample libraries and account states. They
 
 ## Get started
 
-1. Download and run **AMP.Setup.0.3.7.exe**, then launch AMP.
+1. Download and run **AMP.Setup.0.3.8.exe**, then launch AMP.
 2. Open **Settings** to connect Spotify or SoundCloud, or add a folder of local audio files.
 3. Search for music, save tracks to your library, and build a playlist or queue across sources.
+
+From 0.3.7, install 0.3.8 once over your existing AMP installation. Future published releases appear in AMP automatically; use **Settings > AMP updates** to download, then **Restart and update** when you are ready. Installation asks for confirmation and stops playback. Checks run at startup and every six hours; nothing installs just because you close AMP.
 
 Spotify sign-in uses AMP's bundled public app configuration. Development-mode access requires an eligible, allowlisted account; playback requires Premium. SoundCloud search can work without signing in. Windows publisher signing is not configured, so SmartScreen may show a warning. Library import does not require Premium.
 
@@ -46,10 +48,11 @@ Spotify sign-in uses AMP's bundled public app configuration. Development-mode ac
 - **Discovery:** song-seeded stations and daily mixes scored by tempo, genre and mood; artist and album pages, with mood and genre filters.
 - **Listening stats:** on-device listening history and statistics.
 - **SoundCloud downloads:** audio downloads for eligible tracks.
-- **Appearance:** continuous glass surfaces, cover-derived accents and an optional Windows audio pulse.
+- **Appearance:** continuous glass surfaces, Glass only, Album pattern, Ambient drift and Solid colour backgrounds, cover-derived accents and an optional Windows audio pulse.
 - **Discord:** optional Rich Presence.
+- **Updates:** in-app release checks, download progress and a confirmed restart to install Windows updates.
 
-Current source adds Glass only, Album pattern, Ambient drift and Solid colour backgrounds; the downloadable installer remains 0.3.7. In a controlled visible offline fixture on 16 logical processors, ambient CPU fell from 2.52% to 0.09% while paused and 3.24% to 0.26% with simulated playback ticks. These are whole-machine CPU measurements, not live provider playback or proof of lower RAM use.
+In a controlled visible offline fixture on 16 logical processors, ambient CPU fell from 2.52% to 0.09% while paused and 3.24% to 0.26% with simulated playback ticks. These are whole-machine CPU measurements, not live provider playback or proof of lower RAM use.
 
 Spotify crossfade is unavailable. YouTube uses its existing embedded player: ads may play without Premium, and videos that prohibit embedding are skipped. Encrypted SoundCloud tracks need the packaged production build. Higher memory use and recurring playback flicker remain under investigation. YouTube playlist import and Apple Music expansion remain deferred.
 

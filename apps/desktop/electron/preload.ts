@@ -10,6 +10,17 @@ contextBridge.exposeInMainWorld("spotCloud", {
       return () => ipcRenderer.removeListener("spot-cloud:window-material-changed", listener);
     }
   },
+  updates: {
+    getState: () => ipcRenderer.invoke("spot-cloud:update-get-state"),
+    check: () => ipcRenderer.invoke("spot-cloud:update-check"),
+    download: () => ipcRenderer.invoke("spot-cloud:update-download"),
+    install: () => ipcRenderer.invoke("spot-cloud:update-install"),
+    onChanged: (callback: (state: import("../src/lib/appUpdates").AppUpdateState) => void) => {
+      const listener=(_event:unknown,state:import("../src/lib/appUpdates").AppUpdateState)=>callback(state);
+      ipcRenderer.on("spot-cloud:update-state",listener);
+      return ()=>ipcRenderer.removeListener("spot-cloud:update-state",listener);
+    }
+  },
   runtime: {
     getInfo: () => ipcRenderer.invoke("spot-cloud:get-runtime-info"),
     reload: () => ipcRenderer.invoke("spot-cloud:reload-runtime")

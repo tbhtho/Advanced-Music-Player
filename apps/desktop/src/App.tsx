@@ -76,6 +76,7 @@ import {
   type ListeningStats
 } from "@/lib/localStore";
 import { audioReactor } from "@/lib/audioReactor";
+import { AppUpdatesCard, UpdateNotice } from "@/components/AppUpdates";
 import { SongAppearance } from "@/components/SongAppearance";
 import { useShallow } from "zustand/react/shallow";
 import { type BackgroundMode } from "@/lib/songAppearance";
@@ -487,6 +488,7 @@ export function App() {
           <main
             className="amp-main flex min-h-0 min-w-0 flex-col"
           >
+            <UpdateNotice />
             <NoticeBanner />
             <div className="amp-page-scroll min-h-0 flex-1 overflow-y-auto">
               {/* No AnimatePresence/mode="wait" here: waiting for the outgoing page's exit to finish
@@ -5259,6 +5261,7 @@ function SettingsPage() {
         </div>
 
         <div className="space-y-6">
+          <AppUpdatesCard />
           <AppearanceCard />
           <LocalMusicCard />
           <DiscordCard />

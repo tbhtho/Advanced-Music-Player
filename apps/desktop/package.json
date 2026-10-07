@@ -1,7 +1,7 @@
 {
   "name": "@amp/desktop",
   "private": true,
-  "version": "0.3.7",
+  "version": "0.3.8",
   "description": "AMP desktop app",
   "author": "alesxxxx",
   "type": "module",
@@ -62,9 +62,18 @@
       "createStartMenuShortcut": true,
       "shortcutName": "AMP",
       "include": "build/installer.nsh"
+    },
+    "artifactName": "AMP.Setup.${version}.${ext}",
+    "publish": {
+      "provider": "github",
+      "owner": "tbhtho",
+      "repo": "Advanced-Music-Player",
+      "private": false,
+      "releaseType": "release"
     }
   },
   "dependencies": {
+    "electron-updater": "6.8.9",
     "music-metadata": "^11.13.0",
     "youtubei.js": "^17.2.0"
   },

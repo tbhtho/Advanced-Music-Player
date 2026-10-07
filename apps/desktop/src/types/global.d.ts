@@ -1,3 +1,4 @@
+import type { AppUpdateState } from "../lib/appUpdates";
 import type {
   OAuthProvider,
   Provider,
@@ -110,6 +111,13 @@ interface GatewayResponse<T = unknown> {
 }
 
 interface SpotCloudBridge {
+  updates?: {
+    getState(): Promise<AppUpdateState>;
+    check(): Promise<AppUpdateState>;
+    download(): Promise<AppUpdateState>;
+    install(): Promise<boolean>;
+    onChanged(callback: (state: AppUpdateState) => void): () => void;
+  };
   windowMaterial?: {
     initial: string;
     get(): Promise<"opaque" | "acrylic" | "vibrancy">;
