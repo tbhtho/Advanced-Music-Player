@@ -1,67 +1,58 @@
-<p align="center">
-  <img src="apps/desktop/build/icon.png" width="112" alt="AMP play-button icon">
-</p>
-
 # AMP - Advanced Music Player
 
-[![CI](https://github.com/tbhtho/Advanced-Music-Player/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/tbhtho/Advanced-Music-Player/actions/workflows/ci.yml)
-[![License: not declared](https://img.shields.io/badge/License-not_declared-lightgrey.svg)](#license)
-![Platform](https://img.shields.io/badge/platform-Windows-blue.svg)
+[![CI](https://github.com/tbhtho/Advanced-Music-Player/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/tbhtho/Advanced-Music-Player/actions/workflows/ci.yml) [![License: not declared](https://img.shields.io/badge/License-not_declared-lightgrey.svg)](#license) ![Windows x64 release](https://img.shields.io/badge/platform-Windows_x64-blue.svg)
 
-Spotify, SoundCloud, YouTube, and your local music in one library, with mixed playlists and a single queue.
+<img src="apps/desktop/build/icon.png" align="right" width="72" alt="AMP play-button icon">
 
-## Get AMP
+One library and playback queue for Spotify, SoundCloud and your own music.
 
-**Windows:** [Download AMP 0.3.7](https://github.com/tbhtho/Advanced-Music-Player/releases/download/v0.3.7/AMP.Setup.0.3.7.exe) · [Release notes and checksums](https://github.com/tbhtho/Advanced-Music-Player/releases/tag/v0.3.7).
-
-The installer uses production castLabs VMP signing. Windows publisher signing is not configured, so SmartScreen may show a warning. To run the current source, follow the [development setup](docs/DEVELOPMENT.md).
+**[Download AMP 0.3.7 for Windows](https://github.com/tbhtho/Advanced-Music-Player/releases/download/v0.3.7/AMP.Setup.0.3.7.exe)** · [Release notes and checksums](https://github.com/tbhtho/Advanced-Music-Player/releases/tag/v0.3.7)
 
 <p align="center">
-  <a href="docs/screenshots/library-0.3.7.png"><img src="docs/screenshots/library-0.3.7.png" width="960" alt="AMP 0.3.7 Library with attached glass surfaces and fictional Spotify and SoundCloud tracks"></a><br>
-  <sub>Continuous Library, sidebar and Now Playing with subtle provider blooms.</sub>
+  <a href="docs/screenshots/library-0.3.7.png"><img src="docs/screenshots/library-0.3.7.png" width="960" alt="AMP 0.3.7 showing a combined Spotify and SoundCloud Library, a mixed queue and continuous glass surfaces"></a><br>
+  <sub>Library and Now Playing, captured from 0.3.7 with fictional demo tracks.</sub>
 </p>
 
 <table>
   <tr>
-    <td width="50%"><a href="docs/screenshots/home-0.3.5.png"><img src="docs/screenshots/home-0.3.5.png" width="100%" alt="AMP 0.3.5 Home showing daily mixes and song stations with sample tracks"></a><br><sub>Daily mixes and song stations.</sub></td>
-    <td width="50%"><a href="docs/screenshots/settings-0.3.5.png"><img src="docs/screenshots/settings-0.3.5.png" width="100%" alt="AMP 0.3.5 Settings showing sample provider connections, appearance options and local music folders"></a><br><sub>Provider connections, appearance and local music.</sub></td>
+    <td width="50%"><a href="docs/screenshots/home-0.3.5.png"><img src="docs/screenshots/home-0.3.5.png" width="100%" alt="AMP Home showing six daily mixes and song-seeded stations"></a><br><sub>Daily mixes and song stations. Earlier 0.3.5 interface.</sub></td>
+    <td width="50%"><a href="docs/screenshots/playlists-0.3.5.png"><img src="docs/screenshots/playlists-0.3.5.png" width="100%" alt="AMP playlist editor containing Spotify and SoundCloud tracks in one Evening collection"></a><br><sub>Mixed-provider playlists. Earlier 0.3.5 interface.</sub></td>
   </tr>
 </table>
 
-The Library capture shows 0.3.7 with fictional demo tracks and original sample covers; the Home and Settings captures show the earlier 0.3.5 interface with sample states. Select an image to view it at full size. [Capture details](docs/screenshots/README.md).
+<details>
+<summary>Settings and provider connections</summary>
+<p align="center">
+  <a href="docs/screenshots/settings-0.3.5.png"><img src="docs/screenshots/settings-0.3.5.png" width="960" alt="AMP Settings showing sample provider connections, appearance preferences and a local music folder"></a><br>
+  <sub>Connections, appearance and local music. Earlier 0.3.5 interface.</sub>
+</p>
+</details>
 
-## Quick start
+These are real frontend captures using sample libraries and account states. They do not demonstrate live playback. Select an image for full size. [Capture details](docs/screenshots/README.md).
 
-1. Launch AMP and open **Settings** to connect the providers you want to use.
-2. Search SoundCloud and YouTube without signing in, or connect Spotify using AMP's bundled public app configuration. Spotify development-mode access requires an eligible, allowlisted account; playback requires Premium.
-3. Add tracks or your own audio files to the library, mix them into playlists, and play them from one queue.
+## Get started
 
-See [provider setup and playback notes](docs/PROVIDER-NOTES.md) for account setup, browser-session handling, and provider limits.
+1. Download and run **AMP.Setup.0.3.7.exe**, then launch AMP.
+2. Open **Settings** to connect Spotify or SoundCloud, or add a folder of local audio files.
+3. Search for music, save tracks to your library, and build a playlist or queue across sources.
+
+Spotify sign-in uses AMP's bundled public app configuration. Development-mode access requires an eligible, allowlisted account; playback requires Premium. SoundCloud search can work without signing in. Windows publisher signing is not configured, so SmartScreen may show a warning. [Provider setup and playback notes](docs/PROVIDER-NOTES.md).
 
 ## Features
 
-- Unified search across Spotify, SoundCloud and YouTube (SoundCloud + YouTube work without signing in)
-- Play your own local audio files (mp3, m4a, flac, wav, ogg…) alongside everything else
-- One library and playlists that freely mix every source
-- Like/save on Spotify and SoundCloud, everywhere - player bar, lists, search, playlists
-- Song-seeded radio and daily mixes, scored by tempo / genre / vibe
-- Artist and album pages, mood + genre filters, on-device listening stats
-- SoundCloud audio downloads for eligible tracks, optional Discord Rich Presence
-- Windows audio-reactive gradient (beat-synced)
+- **Search and local music:** Spotify, SoundCloud and existing YouTube search, plus local MP3, M4A, FLAC, WAV and OGG files.
+- **Library, playlists and queue:** combine sources, reorder the queue, shuffle, seek and adjust volume by provider. A compact mini-player and media-key controls keep playback close.
+- **Likes and saves:** Spotify and SoundCloud controls in the player bar, track lists, search results and playlists.
+- **Discovery:** song-seeded stations and daily mixes scored by tempo, genre and mood; artist and album pages, with mood and genre filters.
+- **Listening stats:** on-device listening history and statistics.
+- **SoundCloud downloads:** audio downloads for eligible tracks.
+- **Appearance:** continuous glass surfaces, cover-derived accents and an optional Windows audio pulse.
+- **Discord:** optional Rich Presence.
 
-## Playback notes
+Spotify crossfade is unavailable. YouTube uses its existing embedded player: ads may play without Premium, and videos that prohibit embedding are skipped. Encrypted SoundCloud tracks need the packaged production build. Higher CPU and memory use during longer sessions remain under investigation.
 
-Spotify does not support crossfade in AMP. YouTube uses its official embedded player: non-Premium accounts may hear ads, and videos that block embedding are skipped. Encrypted SoundCloud tracks require a packaged, production VMP-signed build; development builds cannot play them.
-
-AMP is a personal project. Use only content you are entitled to access, follow the providers' terms, and do not redistribute builds.
-
-## Documentation
-
-- [Provider setup and playback notes](docs/PROVIDER-NOTES.md)
-- [Development and packaging](docs/DEVELOPMENT.md)
-- [Release workflow](RELEASING.md)
-- [SoundCloud DRM signing](apps/desktop/DRM-SIGNING.md)
+[Provider notes](docs/PROVIDER-NOTES.md) · [Development and packaging](docs/DEVELOPMENT.md) · [Release workflow](RELEASING.md)
 
 ## License
 
-No repository-wide license is declared in this checkout. Source access does not establish redistribution permission; retain provider terms and third-party notices.
+No repository-wide license is declared. Source access does not grant redistribution permission; do not redistribute builds. Follow provider terms and retain third-party notices.

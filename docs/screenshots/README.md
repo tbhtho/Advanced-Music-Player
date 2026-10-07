@@ -1,16 +1,12 @@
 # AMP screenshots
 
-[Library 0.3.7](library-0.3.7.png) is a native-window capture of the release frontend in an isolated offline preview. It shows the final subtle track blooms, attached surfaces and original fictional artwork. Playback and external requests are disabled in this fixture. No real library, accounts or credentials appear. A still capture does not verify animation or external wallpaper blur; Static, reduced-motion and hidden-window behavior were checked separately in the running renderer.
+These are actual captures of AMP's frontend in an isolated offline preview. Tracks, playlists, artwork and connection states are sample data. They show the interface, not live provider sign-in or playback. Still images do not verify motion or external desktop blur.
 
-The older captures below show 0.3.5.
+- [Library 0.3.7](library-0.3.7.png): continuous Library and Now Playing, subtle provider highlights, and original fictional covers.
+- [Home 0.3.5](home-0.3.5.png): daily mixes and song stations.
+- [Playlists 0.3.5](playlists-0.3.5.png): a mixed-provider playlist and its editing controls.
+- [Settings 0.3.5](settings-0.3.5.png): sample connections, appearance preferences and local music folders.
 
+The Library capture uses [0.3.7 source](https://github.com/tbhtho/Advanced-Music-Player/commit/f9602e59d06f2ba3b1962b5aa8292507a589b93b). The older images use [0.3.5 frontend source](https://github.com/tbhtho/Advanced-Music-Player/commit/1172aa8b04c4d5d425aee7c5b08eb2596c14a427) and are labeled as an earlier interface in the README.
 
-These are actual captures of AMP's released frontend code, displayed in an isolated preview with sample tracks, playlists, artwork and provider account states. They show Home, the playlist editor and Settings. No personal library, credentials or live playback appear in the images. The external desktop backdrop is not included in these captures.
-
-Release source: [1172aa8b04c4d5d425aee7c5b08eb2596c14a427](https://github.com/tbhtho/Advanced-Music-Player/commit/1172aa8b04c4d5d425aee7c5b08eb2596c14a427). The App and stylesheet match the compact visual revision included in that release. The captures predate the stopped Ongaku follow-up and contain none of its changes.
-
-- [Home](home-0.3.5.png): daily mixes and stations.
-- [Playlists](playlists-0.3.5.png): mixed-provider entries and compact controls.
-- [Settings](settings-0.3.5.png): sample connection states, appearance options and local files.
-
-Each PNG is 1280 by 860 pixels and is copied without editing or rescaling. Sample connection indicators do not establish live sign-in or playback compatibility.
+All four PNGs are 1280 by 860 pixels. Their original pixels are preserved.
