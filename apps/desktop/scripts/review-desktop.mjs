@@ -33,7 +33,7 @@ try {
   if (process.env.AMP_BENCH_REUSE_BUILD !== "1") await build({ configFile: false, logLevel: "warn", build: { ssr: path.join(sourceRoot, "apps/desktop/electron/windowMaterial.ts"), outDir: nativeBuild, emptyOutDir: false, rollupOptions: { output: { entryFileNames: "windowMaterial.mjs" } } } });
   nativeModule = path.join(nativeBuild, "windowMaterial.mjs");
 } catch (error) { if (error.code !== "ENOENT") throw error; }
-const spec = { accentSource: process.env.AMP_BENCH_ACCENT ?? "static", visible: process.env.AMP_BENCH_VISIBLE === "1", hold: process.env.AMP_BENCH_HOLD === "1", profile, build: fixtureBuild, output, nativeModule, material: process.env.AMP_BENCH_MATERIAL ?? "opaque" };
+const spec = { appearanceChecksOnly: process.env.AMP_REVIEW_CHECKS_ONLY === "1", appearanceReview: process.env.AMP_REVIEW_APPEARANCE === "1", accentSource: process.env.AMP_BENCH_ACCENT ?? "static", visible: process.env.AMP_BENCH_VISIBLE === "1", hold: process.env.AMP_BENCH_HOLD === "1", profile, build: fixtureBuild, output, nativeModule, material: process.env.AMP_BENCH_MATERIAL ?? "opaque" };
 const specification = path.join(output, "fixture-spec.json");
 await writeFile(specification, JSON.stringify(spec));
 const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE;

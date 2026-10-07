@@ -90,6 +90,11 @@ contextBridge.exposeInMainWorld("spotCloud", {
     }
   },
   windowControls: {
+    onVisibilityChanged: (callback: (visible: boolean) => void) => {
+      const listener=(_event:unknown,visible:boolean)=>callback(visible);
+      ipcRenderer.on("spot-cloud:window-visibility-changed",listener);
+      return ()=>ipcRenderer.removeListener("spot-cloud:window-visibility-changed",listener);
+    },
     getState: () => ipcRenderer.invoke("spot-cloud:get-window-state"),
     finishStartup: () => ipcRenderer.invoke("spot-cloud:finish-startup-window"),
     minimize: () => ipcRenderer.invoke("spot-cloud:minimize-window"),

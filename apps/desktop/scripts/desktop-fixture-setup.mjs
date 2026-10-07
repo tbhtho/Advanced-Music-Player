@@ -6,8 +6,11 @@ const delay = (ms, signal) => new Promise((resolve, reject) => {
 const track = createDemoTrack;
 const tracks = Array.from({ length: 120 }, (_, i) => track(i, i % 2 ? "soundcloud" : "spotify"));
 const now = new Date().toISOString();
-localStorage.clear();
-localStorage.setItem("spot-cloud.ui-prefs", JSON.stringify({ onboardingComplete: true, accentSource: "static", discordPresenceEnabled: false }));
+if (!localStorage.getItem("amp.fixture.seeded")) {
+  localStorage.clear();
+  localStorage.setItem("spot-cloud.ui-prefs", JSON.stringify({ onboardingComplete: true, accentSource: "static", discordPresenceEnabled: false }));
+  localStorage.setItem("amp.fixture.seeded","1");
+}
 localStorage.setItem("spot-cloud.project-tracks", JSON.stringify(tracks.map((item) => ({ id: `fixture-project-${item.id}`, ownerId: "local-user", provider: item.provider, providerTrackId: item.providerTrackId, source: "library-sync", track: item, createdAt: now, updatedAt: now }))));
 localStorage.setItem("spot-cloud.playlists", JSON.stringify([{ id: "fixture-playlist", ownerId: "local-user", title: "Evening collection", entries: tracks.slice(0, 24).map((item, i) => ({ id: `fixture-entry-${i}`, playlistId: "fixture-playlist", sortOrder: i, track: item })), createdAt: now, updatedAt: now }]));
 

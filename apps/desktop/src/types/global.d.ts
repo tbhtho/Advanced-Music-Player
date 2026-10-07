@@ -88,6 +88,7 @@ interface ResolvedArtwork {
 }
 
 interface DesktopWindowState {
+  isVisible?: boolean;
   canCustomize: boolean;
   isMaximized: boolean;
 }
@@ -172,6 +173,7 @@ interface SpotCloudBridge {
     onMediaKey(callback: (action: "play-pause" | "next" | "previous") => void): () => void;
   };
   windowControls: {
+    onVisibilityChanged?(callback: (visible: boolean) => void): () => void;
     getState(): Promise<DesktopWindowState>;
     finishStartup(): Promise<DesktopWindowState>;
     minimize(): Promise<void>;

@@ -188,6 +188,7 @@ interface ResolvedArtwork {
 }
 
 interface DesktopWindowState {
+  isVisible?: boolean;
   canCustomize: boolean;
   isMaximized: boolean;
 }
@@ -2786,6 +2787,7 @@ function usesCustomWindowChrome(): boolean {
 
 function getDesktopWindowState(): DesktopWindowState {
   return {
+    isVisible: Boolean(mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible() && !mainWindow.isMinimized()),
     canCustomize: usesCustomWindowChrome(),
     isMaximized: Boolean(mainWindow && !mainWindow.isDestroyed() && mainWindow.isMaximized())
   };
@@ -3692,6 +3694,16 @@ async function createMainWindow() {
     });
   }
 
+  const notifyVisibility = () => {
+    if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
+      window.webContents.send("spot-cloud:window-visibility-changed", window.isVisible() && !window.isMinimized());
+    }
+  };
+  window.on("show", notifyVisibility);
+  window.on("hide", notifyVisibility);
+  window.on("minimize", notifyVisibility);
+  window.on("restore", notifyVisibility);
+  window.webContents.on("did-finish-load", notifyVisibility);
   logStartup("createMainWindow:browser-window-created");
   logStartup("createMainWindow:preload-path", preloadPath);
 

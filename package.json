@@ -11,7 +11,7 @@
     "build": "corepack pnpm --filter @amp/desktop build",
     "start": "corepack pnpm --filter @amp/desktop exec electron .",
     "typecheck": "corepack pnpm --filter @amp/desktop typecheck",
-    "test": "node packages/core/run-advance-test.mjs && node apps/desktop/scripts/run-feature-tests.mjs && node apps/desktop/scripts/run-mix-composition-tests.mjs && node apps/desktop/scripts/run-playback-guard-tests.mjs && node apps/desktop/scripts/run-captcha-tests.mjs && node apps/desktop/scripts/run-remote-like-tests.mjs && node apps/desktop/scripts/run-backend-tests.mjs && node apps/desktop/scripts/run-desktop-config-tests.mjs && node apps/desktop/scripts/run-runtime-resource-tests.mjs",
+    "test": "node packages/core/run-advance-test.mjs && node apps/desktop/scripts/run-feature-tests.mjs && node apps/desktop/scripts/run-mix-composition-tests.mjs && node apps/desktop/scripts/run-playback-guard-tests.mjs && node apps/desktop/scripts/run-captcha-tests.mjs && node apps/desktop/scripts/run-remote-like-tests.mjs && node apps/desktop/scripts/run-backend-tests.mjs && node apps/desktop/scripts/run-desktop-config-tests.mjs && node apps/desktop/scripts/run-runtime-resource-tests.mjs && node apps/desktop/scripts/run-appearance-tests.mjs",
     "benchmark:backend": "node --expose-gc apps/desktop/scripts/benchmark-backend.mjs",
     "benchmark:desktop": "node apps/desktop/scripts/benchmark-desktop.mjs",
     "verify": "corepack pnpm test && corepack pnpm typecheck && corepack pnpm build",

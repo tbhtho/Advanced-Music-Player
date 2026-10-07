@@ -12,6 +12,7 @@ import {
   type UnifiedTrack
 } from "@amp/core";
 import { createDefaultConnections } from "./defaults";
+import { BACKGROUND_MODES, normalizeBackgroundColor, type BackgroundMode } from "./songAppearance";
 import type { TrackFeatureMap } from "./trackFeatures";
 
 const PLAYLISTS_KEY = "spot-cloud.playlists";
@@ -28,6 +29,8 @@ export const BEAT_INTENSITY_MAX = 2;
 
 interface UiPreferences {
   accentSource?: AccentSource;
+  backgroundMode?: BackgroundMode;
+  backgroundColor?: string;
   beatIntensity?: number;
   soundCloudProfileUrl?: string;
   volume?: number;
@@ -342,6 +345,23 @@ export function saveAccentSource(source: AccentSource): void {
   writeJson(UI_PREFS_KEY, { ...prefs, accentSource: source });
 }
 
+export function loadBackgroundMode(): BackgroundMode {
+  const prefs=readJson<UiPreferences>(UI_PREFS_KEY,{});
+  return BACKGROUND_MODES.includes(prefs.backgroundMode as BackgroundMode)
+    ? prefs.backgroundMode! : prefs.accentSource==="static" ? "glass" : "album";
+}
+export function saveBackgroundMode(mode: BackgroundMode): void {
+  if (!BACKGROUND_MODES.includes(mode)) return;
+  const prefs=readJson<UiPreferences>(UI_PREFS_KEY,{});
+  writeJson(UI_PREFS_KEY,{...prefs,backgroundMode:mode});
+}
+export function loadBackgroundColor(): string {
+  return normalizeBackgroundColor(readJson<UiPreferences>(UI_PREFS_KEY,{}).backgroundColor);
+}
+export function saveBackgroundColor(color: string): void {
+  const prefs=readJson<UiPreferences>(UI_PREFS_KEY,{});
+  writeJson(UI_PREFS_KEY,{...prefs,backgroundColor:normalizeBackgroundColor(color)});
+}
 export function loadBeatIntensity(): number {
   const prefs = readJson<UiPreferences>(UI_PREFS_KEY, {});
   const value = prefs.beatIntensity;

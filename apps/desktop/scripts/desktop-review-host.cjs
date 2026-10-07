@@ -18,6 +18,7 @@ let createDemoTrack;
 const track = (...args) => createDemoTrack(...args);
 ipcMain.handle("amp-fixture", async (_event, method, request) => {
   const owner = BrowserWindow.fromWebContents(_event.sender);
+  if (method === "windowState") return {canCustomize:true,isMaximized:owner.isMaximized(),isVisible:owner.isVisible()&&!owner.isMinimized()};
   if (method === "windowMinimize") { owner.minimize(); return; }
   if (method === "windowMaximize") { owner.isMaximized() ? owner.unmaximize() : owner.maximize(); return {canCustomize:true,isMaximized:owner.isMaximized()}; }
   if (method === "windowClose") { owner.close(); return; }
@@ -58,7 +59,7 @@ async function run() {
     applyMaterial = native.applyWindowMaterial;
   }
   let backdrop;
-  if (spec.visible) {
+  if (spec.visible && !spec.appearanceReview) {
     backdrop = new BrowserWindow({title:"AMP native glass test backdrop",width:1320,height:900,frame:false,show:false,webPreferences:{contextIsolation:true,sandbox:true}});
     await backdrop.loadURL("data:text/html,"+encodeURIComponent("<style>html,body{margin:0;height:100%;background:linear-gradient(120deg,#526a82 0%,#234838 40%,#866657 72%,#443e63 100%)}body:after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 100px,#ffffff66 100px 104px,transparent 104px 200px)}</style>"));
     backdrop.center();backdrop.showInactive();
@@ -67,6 +68,9 @@ async function run() {
   material = applyMaterial ? await applyMaterial(window, preferred) : preferred;
   window.once("closed",()=>{if(backdrop && !backdrop.isDestroyed())backdrop.destroy();if(spec.hold)app.quit();});
   const contents = window.webContents;
+  const notifyVisibility=()=>contents.send("amp-fixture-visibility",window.isVisible()&&!window.isMinimized());
+  for(const event of ["show","hide","minimize","restore"]) window.on(event,notifyVisibility);
+  contents.on("did-finish-load",notifyVisibility);
   if (!spec.visible) contents.setFrameRate(60);
   const errors = [];
   contents.on("console-message", (_event, level, message) => { if (level >= 2) { errors.push(message); console.error("Fixture renderer:", message); } });
@@ -84,8 +88,14 @@ async function run() {
     }; poll();
   })`, true);
   startup.hostReadyMs = +(performance.now() - startedAt).toFixed(2);
-  if (spec.visible) { window.center(); window.show(); }
+  if (spec.visible) { window.center(); window.showInactive(); }
   await delay(800);
+  if (spec.appearanceReview) {
+    await require('./appearance-review.cjs')({app,window,contents,spec,material});
+    assert.deepEqual(errors, [], 'Fixture renderer reported an error');
+    if (!spec.hold) {window.destroy();app.quit();}
+    return;
+  }
   const searches = await contents.executeJavaScript(`(async () => {
     const store = window.__AMP_TEST_STORE__;
     const initialCalls = window.__AMP_FIXTURE__.fetchCalls;
@@ -170,17 +180,20 @@ async function run() {
       return {hidden:document.hidden,mode:document.documentElement.dataset.accentSource,state:document.documentElement.dataset.ambientMotion,animation:style.animationName,playState:style.animationPlayState,transform:style.transform,filter:style.filter,background:style.backgroundImage,body:getComputedStyle(document.body).backgroundColor};
     })()`);
     await contents.executeJavaScript("window.__AMP_TEST_STORE__.getState().setAccentSource('static')"); await delay(80);
+    const hasModes=await contents.executeJavaScript("typeof window.__AMP_TEST_STORE__.getState().setBackgroundMode==='function'");
+    if(hasModes)await contents.executeJavaScript("window.__AMP_TEST_STORE__.getState().setBackgroundMode('glass')");
     const stationary = await inspectAmbient(); assert.equal(stationary.animation,'none');
     await contents.executeJavaScript("window.__AMP_TEST_STORE__.getState().setAccentSource('artwork')"); await delay(80);
+    if(hasModes)await contents.executeJavaScript("window.__AMP_TEST_STORE__.getState().setBackgroundMode('ambient')");
     contents.debugger.attach('1.3');
     await contents.debugger.sendCommand('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});
     const reduced = await inspectAmbient(); assert.equal(reduced.animation,'none');
     await contents.debugger.sendCommand('Emulation.setEmulatedMedia',{features:[]}); contents.debugger.detach();
     window.show(); await delay(180);
-    const first = await inspectAmbient(); await delay(400); const moving = await inspectAmbient();
-    assert.equal(moving.state,'running'); assert.equal(moving.playState,'running'); assert.notEqual(first.transform,moving.transform);
+    const first = await inspectAmbient(); await delay(hasModes?1100:400); const moving = await inspectAmbient();
+    assert.equal(moving.state,'running'); if(!hasModes)assert.equal(moving.playState,'running'); assert.notEqual(first.transform,moving.transform);
     window.hide(); await delay(180); const hidden = await inspectAmbient();
-    assert.equal(hidden.hidden,true); assert.equal(hidden.state,'paused'); assert.equal(hidden.playState,'paused');
+    assert.equal(window.isVisible(),false); assert.equal(hidden.state,'paused'); if(!hasModes)assert.equal(hidden.playState,'paused');
     window.show(); await delay(180); const restored=await inspectAmbient(); assert.equal(restored.state,'running');
     ambientReview={stationary,reduced,first,moving,hidden,restored};
   }
@@ -197,7 +210,7 @@ async function run() {
   }
   result.limitations[1] = spec.visible ? "Visible native BrowserWindow; display refresh is not comparable to the 60 fps offscreen run." : result.limitations[1];
   if (spec.visible) {
-    window.show();window.focus();await delay(300);
+    window.showInactive();await delay(300);
     const sources = await desktopCapturer.getSources({types:['window'],thumbnailSize:{width:1280,height:860}});
     const source = sources.find(item => item.id === window.getMediaSourceId());
     if(source && !source.thumbnail.isEmpty()) {
@@ -211,4 +224,4 @@ async function run() {
   else console.log("Native AMP preview remains open in its isolated profile.");
 }
 run().catch((error) => { console.error(error); app.exit(1); });
-if (!spec.hold) setTimeout(() => { console.error("Fixture deadline exceeded"); app.exit(1); }, 45000).unref();
+if (!spec.hold) setTimeout(() => { console.error("Fixture deadline exceeded"); app.exit(1); }, spec.appearanceReview ? 240000 : 45000).unref();

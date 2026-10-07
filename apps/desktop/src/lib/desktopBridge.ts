@@ -70,6 +70,7 @@ export interface GatewayResponse<T = unknown> {
 }
 
 export interface DesktopWindowState {
+  isVisible?: boolean;
   canCustomize: boolean;
   isMaximized: boolean;
 }

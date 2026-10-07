@@ -76,6 +76,10 @@ import {
   type ListeningStats
 } from "@/lib/localStore";
 import { audioReactor } from "@/lib/audioReactor";
+import { SongAppearance } from "@/components/SongAppearance";
+import { useShallow } from "zustand/react/shallow";
+import { type BackgroundMode } from "@/lib/songAppearance";
+import { isWindowActive, subscribeWindowActivity } from "@/lib/windowActivity";
 import { ArtworkImage } from "@/components/ArtworkImage";
 import { VirtualList } from "@/components/VirtualList";
 import { DesktopTitleBar } from "@/components/DesktopTitleBar";
@@ -274,7 +278,6 @@ function clampUnit(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
 
-const DEFAULT_ACCENT = "#e8e4da";
 
 /**
  * Tints the GUI accent (`--acid`) toward the current song's artwork colour, so the otherwise
@@ -383,160 +386,6 @@ function PlaybackHotkeys() {
   return null;
 }
 
-function SongColor() {
-  const artworkUrl = useAppStore(
-    (state) => state.playback.queue[state.playback.currentIndex]?.artworkUrl
-  );
-  const accentSource = useAppStore((state) => state.accentSource);
-  const runtime = useAppStore((state) => state.runtime);
-  const beatIntensity = useAppStore((state) => state.beatIntensity);
-  const status = useAppStore((state) => state.playback.status);
-  // The song's artwork colour is the fixed hue; audio mode only pulses its saturation/brightness.
-  const baseColorRef = useRef<{ r: number; g: number; b: number }>({ r: 232, g: 228, b: 218 });
-
-  // Mirror the user's beat-pulse strength onto :root so the GPU beat layer can scale itself.
-  useEffect(() => {
-    document.documentElement.style.setProperty("--beat-intensity", String(beatIntensity));
-  }, [beatIntensity]);
-
-  // Ambient drift follows the existing colour preference and sleeps when the document is hidden.
-  useEffect(() => {
-    const root = document.documentElement;
-    const sync = () => {
-      root.dataset.accentSource = accentSource;
-      root.dataset.ambientMotion = accentSource !== "static" && !document.hidden ? "running" : "paused";
-    };
-    sync();
-    document.addEventListener("visibilitychange", sync);
-    return () => {
-      document.removeEventListener("visibilitychange", sync);
-      delete root.dataset.accentSource;
-      delete root.dataset.ambientMotion;
-    };
-  }, [accentSource]);
-
-  // Capture and visual work exist only during visible playback. Media playback is independent.
-  useEffect(() => {
-    if (accentSource !== "audio" || runtime?.platform !== "win32") {
-      audioReactor.stop();
-      audioReactor.releaseLoopback();
-      return;
-    }
-    let releaseTimer: ReturnType<typeof setTimeout> | undefined;
-    const sync = () => {
-      clearTimeout(releaseTimer);
-      if (status === "playing" && !document.hidden) audioReactor.start();
-      else {
-        audioReactor.stop();
-        if (document.hidden) audioReactor.releaseLoopback();
-        else releaseTimer = setTimeout(() => audioReactor.releaseLoopback(), 1500);
-      }
-    };
-    // A play gesture may precede the store's async playback transition; allow that gesture,
-    // then release immediately if playback did not start. Never capture ordinary paused clicks.
-    const prime = (event: PointerEvent) => {
-      const target = event.target instanceof Element ? event.target.closest('button') : null;
-      if (status === "playing" || /\bplay\b/i.test(target?.getAttribute('aria-label') ?? target?.textContent ?? "")) {
-        audioReactor.primeLoopback();
-      }
-    };
-    sync();
-    document.addEventListener("visibilitychange", sync);
-    window.addEventListener("pointerdown", prime, { capture: true });
-    return () => {
-      document.removeEventListener("visibilitychange", sync);
-      window.removeEventListener("pointerdown", prime, { capture: true });
-      clearTimeout(releaseTimer);
-      audioReactor.stop();
-    };
-  }, [accentSource, runtime?.platform, status]);
-  useEffect(() => () => audioReactor.releaseLoopback(), []);
-
-  // Artwork colour is the baseline (and the full answer in "artwork" mode, or for Spotify).
-  // "static" mode opts out entirely: the UI stays on the fixed neutral accent regardless of art.
-  useEffect(() => {
-    const root = document.documentElement;
-    if (accentSource === "static" || !artworkUrl) {
-      baseColorRef.current = { r: 232, g: 228, b: 218 };
-      root.style.setProperty("--acid", DEFAULT_ACCENT);
-      root.style.setProperty("--song-rgb", "232, 228, 218");
-      return;
-    }
-
-    let cancelled = false;
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      if (cancelled) return;
-      try {
-        const size = 24;
-        const canvas = document.createElement("canvas");
-        canvas.width = size;
-        canvas.height = size;
-        const ctx = canvas.getContext("2d", { willReadFrequently: true });
-        if (!ctx) return;
-        ctx.drawImage(img, 0, 0, size, size);
-        const { data } = ctx.getImageData(0, 0, size, size);
-
-        let r = 0;
-        let g = 0;
-        let b = 0;
-        let count = 0;
-        // Prefer reasonably saturated, non-black pixels for a vivid accent.
-        for (let i = 0; i < data.length; i += 4) {
-          const R = data[i];
-          const G = data[i + 1];
-          const B = data[i + 2];
-          const max = Math.max(R, G, B);
-          const min = Math.min(R, G, B);
-          const sat = max === 0 ? 0 : (max - min) / max;
-          if (sat > 0.28 && max > 45) {
-            r += R;
-            g += G;
-            b += B;
-            count++;
-          }
-        }
-        if (count < 4) {
-          r = g = b = count = 0;
-          for (let i = 0; i < data.length; i += 4) {
-            r += data[i];
-            g += data[i + 1];
-            b += data[i + 2];
-            count++;
-          }
-        }
-        r = Math.round(r / count);
-        g = Math.round(g / count);
-        b = Math.round(b / count);
-
-        // Lift dark colours so accent text/buttons stay legible.
-        const m = Math.max(r, g, b);
-        if (m > 0 && m < 170) {
-          const k = 170 / m;
-          r = Math.min(255, Math.round(r * k));
-          g = Math.min(255, Math.round(g * k));
-          b = Math.min(255, Math.round(b * k));
-        }
-        baseColorRef.current = { r, g, b };
-        root.style.setProperty("--acid", `rgb(${r}, ${g}, ${b})`);
-        root.style.setProperty("--song-rgb", `${r}, ${g}, ${b}`);
-      } catch {
-        root.style.setProperty("--acid", DEFAULT_ACCENT);
-      }
-    };
-    img.onerror = () => {
-      if (!cancelled) root.style.setProperty("--acid", DEFAULT_ACCENT);
-    };
-    img.src = artworkUrl;
-
-    return () => {
-      cancelled = true;
-    };
-  }, [artworkUrl, accentSource]);
-
-  return null;
-}
 
 export function App() {
   const initialize = useAppStore((state) => state.initialize);
@@ -594,7 +443,6 @@ export function App() {
   if (compact) {
     return (
       <MotionConfig reducedMotion="user">
-        <SongColor />
         <DiscordPresenceSync />
         <PlaybackHotkeys />
         <MiniPlayer onExpand={exitCompact} />
@@ -606,7 +454,7 @@ export function App() {
     <MotionConfig reducedMotion="user">
     <HashRouter>
       <div className="amp-shell relative isolate flex h-screen flex-col overflow-hidden text-[var(--ink)]">
-        <div className="amp-ambient-layer" aria-hidden />
+        <SongAppearance />
         {/* One bounded audio-reactive overlay above the native window material. */}
         <div
           id="amp-beat-layer"
@@ -623,7 +471,6 @@ export function App() {
           }}
         />
         <DesktopTitleBar visible={showCustomChrome} />
-        <SongColor />
         <DiscordPresenceSync />
         <PlaybackHotkeys />
         <div
@@ -1066,6 +913,69 @@ function Sidebar() {
   );
 }
 
+
+/** Keep clock updates within the scrubber instead of re-rendering every transport control. */
+const SeekTimeline = memo(function SeekTimeline() {
+  const positionMs=useAppStore(s=>s.playback.positionMs);
+  const duration=useAppStore(s=>s.playback.durationMs);
+  const status=useAppStore(s=>s.playback.status);
+  const trackId=useAppStore(s=>{
+    const track=s.playback.queue[s.playback.currentIndex];
+    return track?track.provider+":"+track.providerTrackId:undefined;
+  });
+  const seek=useAppStore(s=>s.seek);
+  const durationMs=Math.max(duration,1);
+  const [position,setPosition]=useState(positionMs);
+  const [draft,setDraft]=useState(positionMs);
+  const [isSeeking,setIsSeeking]=useState(false);
+  const anchor=useRef({positionMs,at:performance.now()});
+  const pending=useRef<{target:number;at:number;track?:string}|undefined>(undefined);
+  useEffect(()=>{
+    if(isSeeking)return;
+    const now=performance.now();
+    if(pending.current?.track!==trackId)pending.current=undefined;
+    if(pending.current){
+      if(now-pending.current.at<2600 && Math.abs(positionMs-pending.current.target)>1500)return;
+      pending.current=undefined;
+    }
+    anchor.current={positionMs,at:now};
+    setDraft(positionMs);setPosition(positionMs);
+  },[positionMs,status,trackId,isSeeking]);
+  useEffect(()=>{
+    let timer:ReturnType<typeof setInterval>|undefined;
+    const tick=()=>{
+      if(isSeeking)return;
+      const elapsed=status==="playing"?performance.now()-anchor.current.at:0;
+      setPosition(Math.min(durationMs,anchor.current.positionMs+elapsed));
+    };
+    const sync=()=>{
+      clearInterval(timer);
+      if(isWindowActive() && status==="playing"){tick();timer=setInterval(tick,250);}
+    };
+    const unsubscribeActivity=subscribeWindowActivity(sync);
+    return ()=>{clearInterval(timer);unsubscribeActivity();};
+  },[status,durationMs,isSeeking]);
+  const commit=(value:number)=>{
+    if(!trackId)return;
+    const target=Math.max(0,Math.min(durationMs,value)),now=performance.now();
+    pending.current={target,at:now,track:trackId};anchor.current={positionMs:target,at:now};
+    setIsSeeking(false);setDraft(target);setPosition(target);void seek(target);
+  };
+  const displayed=isSeeking?draft:position;
+  return <div className="amp-seek-timeline flex w-full max-w-xl items-center gap-2">
+    <span className="w-9 shrink-0 text-right text-[10px] tabular-nums text-[var(--muted)]">{formatDuration(displayed)}</span>
+    <input type="range" min={0} max={durationMs} step={1000} value={displayed} disabled={!trackId}
+      aria-label="Seek" aria-valuetext={formatDuration(displayed)+" of "+formatDuration(duration)}
+      onPointerDown={()=>setIsSeeking(true)}
+      onChange={event=>{setIsSeeking(true);setDraft(Number(event.target.value));}}
+      onPointerUp={event=>commit(Number(event.currentTarget.value))}
+      onKeyUp={event=>commit(Number(event.currentTarget.value))}
+      onBlur={event=>{if(isSeeking)commit(Number(event.currentTarget.value));}}
+      className="min-w-0 flex-1" style={sliderFill((displayed/durationMs)*100)}/>
+    <span className="w-9 shrink-0 text-[10px] tabular-nums text-[var(--muted)]">{formatDuration(duration)}</span>
+  </div>;
+});
+
 function PlayerBar({
   showQueueToggle,
   queueOpen,
@@ -1077,13 +987,16 @@ function PlayerBar({
   onToggleQueue(): void;
   onEnterCompact(): void;
 }) {
-  const playback = useAppStore((state) => state.playback);
+  const playback = useAppStore(useShallow(({playback})=>({
+    queue:playback.queue,currentIndex:playback.currentIndex,status:playback.status,
+    durationMs:playback.durationMs,volume:playback.volume,providerVolumes:playback.providerVolumes,
+    canGoPrevious:playback.canGoPrevious,canGoNext:playback.canGoNext
+  })));
   const togglePlayback = useAppStore((state) => state.togglePlayback);
   const next = useAppStore((state) => state.next);
   const previous = useAppStore((state) => state.previous);
   const setVolume = useAppStore((state) => state.setVolume);
   const setProviderVolume = useAppStore((state) => state.setProviderVolume);
-  const seek = useAppStore((state) => state.seek);
   const shuffle = useAppStore((state) => state.shuffle);
   const toggleShuffle = useAppStore((state) => state.toggleShuffle);
   const connections = useAppStore((state) => state.connections);
@@ -1094,7 +1007,6 @@ function PlayerBar({
   const openArtist = useAppStore((state) => state.openArtist);
   const navigate = useNavigate();
   const currentTrack = playback.queue[playback.currentIndex];
-  const durationMs = Math.max(playback.durationMs, 1);
 
   const canSyncSoundCloudLikes =
     connections.soundcloud.status === "connected" &&
@@ -1127,8 +1039,6 @@ function PlayerBar({
       void setSpotifyTrackLiked(currentTrack, !currentLiked);
     }
   };
-  const [seekDraft, setSeekDraft] = useState(playback.positionMs);
-  const [isSeeking, setIsSeeking] = useState(false);
   const [volumeDraft, setVolumeDraft] = useState(playback.volume);
   const [isVolumeSliding, setIsVolumeSliding] = useState(false);
   const [providerVolumeDrafts, setProviderVolumeDrafts] = useState(playback.providerVolumes);
@@ -1136,49 +1046,6 @@ function PlayerBar({
   const [providerVolumeSliding, setProviderVolumeSliding] = useState<Provider | null>(null);
   const [advancedVolumeOpen, setAdvancedVolumeOpen] = useState(false);
   const [providerVolumesLinked, setProviderVolumesLinked] = useState(false);
-  // Smooth timer: when playing, increment a local counter every 100ms so the
-  // position display doesn't jump on each 2.5s Spotify poll. Resync to the
-  // polled value so we don't drift.
-  const [smoothPositionMs, setSmoothPositionMs] = useState(playback.positionMs);
-  const smoothPositionRef = useRef(playback.positionMs);
-  smoothPositionRef.current = smoothPositionMs;
-  // After a seek commit, polls from BEFORE the seek still arrive for a beat — accepting them made
-  // the scrubber visibly snap back to the old position until the next fresh poll.
-  const pendingSeekRef = useRef<{ target: number; at: number } | null>(null);
-
-  useEffect(() => {
-    if (isSeeking) {
-      return;
-    }
-    const pending = pendingSeekRef.current;
-    if (pending) {
-      const age = Date.now() - pending.at;
-      // Grace window: for ~one poll cycle after the seek, only accept polls that landed near the
-      // target — anything else is a pre-seek straggler (this also covers seeks smaller than the
-      // proximity threshold). Past the window, accept whatever the engine reports.
-      if (age < 2600 && Math.abs(playback.positionMs - pending.target) > 1500) {
-        return;
-      }
-      pendingSeekRef.current = null;
-    }
-    setSeekDraft(playback.positionMs);
-    setSmoothPositionMs(playback.positionMs);
-  }, [isSeeking, playback.positionMs]);
-
-  useEffect(() => {
-    if (playback.status !== "playing") {
-      return;
-    }
-    const tick = 100;
-    const interval = window.setInterval(() => {
-      const next = Math.min(smoothPositionRef.current + tick, durationMs);
-      setSmoothPositionMs(next);
-    }, tick);
-    return () => window.clearInterval(interval);
-  }, [playback.status, durationMs]);
-
-  const displayedPosition = isSeeking ? seekDraft : smoothPositionMs;
-
   useEffect(() => {
     if (!isVolumeSliding) {
       setVolumeDraft(playback.volume);
@@ -1191,18 +1058,6 @@ function PlayerBar({
       setProviderVolumeDrafts(playback.providerVolumes);
     }
   }, [playback.providerVolumes, providerVolumeSliding]);
-
-  const commitSeek = (value = seekDraft) => {
-    if (!currentTrack) {
-      return;
-    }
-    const nextPositionMs = Math.max(0, Math.min(durationMs, value));
-    setIsSeeking(false);
-    setSeekDraft(nextPositionMs);
-    setSmoothPositionMs(nextPositionMs);
-    pendingSeekRef.current = { target: nextPositionMs, at: Date.now() };
-    void seek(nextPositionMs);
-  };
 
   const commitVolume = (value = volumeDraft) => {
     const nextVolume = clampUnit(value);
@@ -1370,38 +1225,7 @@ function PlayerBar({
               />
             </button>
           </div>
-          <div className="flex w-full max-w-xl items-center gap-2">
-            <span className="w-9 shrink-0 text-right text-[10px] tabular-nums text-[var(--muted)]">
-              {formatDuration(displayedPosition)}
-            </span>
-            <input
-              type="range"
-              min={0}
-              max={durationMs}
-              step={1000}
-              value={displayedPosition}
-              disabled={!currentTrack}
-              aria-label="Seek"
-              aria-valuetext={`${formatDuration(displayedPosition)} of ${formatDuration(playback.durationMs)}`}
-              onPointerDown={() => setIsSeeking(true)}
-              onChange={(event) => {
-                setIsSeeking(true);
-                setSeekDraft(Number(event.target.value));
-              }}
-              onPointerUp={(event) => commitSeek(Number(event.currentTarget.value))}
-              onKeyUp={(event) => commitSeek(Number(event.currentTarget.value))}
-              onBlur={(event) => {
-                if (isSeeking) {
-                  commitSeek(Number(event.currentTarget.value));
-                }
-              }}
-              className="min-w-0 flex-1"
-              style={sliderFill((displayedPosition / durationMs) * 100)}
-            />
-            <span className="w-9 shrink-0 text-[10px] tabular-nums text-[var(--muted)]">
-              {formatDuration(playback.durationMs)}
-            </span>
-          </div>
+          <SeekTimeline />
         </div>
 
         <div className="relative flex w-64 shrink-0 items-center justify-end gap-2">
@@ -4977,98 +4801,71 @@ function SoundCloudInlineError({ message }: { message: string }) {
   );
 }
 
+
 function AppearanceCard() {
-  const accentSource = useAppStore((state) => state.accentSource);
-  const setAccentSource = useAppStore((state) => state.setAccentSource);
-  const runtime = useAppStore((state) => state.runtime);
-  const beatIntensity = useAppStore((state) => state.beatIntensity);
-  const setBeatIntensity = useAppStore((state) => state.setBeatIntensity);
-
-  const options: { id: AccentSource; label: string; hint: string }[] = [
-    { id: "artwork", label: "Album art", hint: "Cover colour with slowly drifting ambient light." },
-    { id: "audio", label: "Song audio", hint: "Drifting cover light and accent pulse on the beat." },
-    { id: "static", label: "Static", hint: "Fixed neutral accent — no colour or pulse." }
+  const accentSource=useAppStore(s=>s.accentSource),setAccentSource=useAppStore(s=>s.setAccentSource);
+  const backgroundMode=useAppStore(s=>s.backgroundMode),setBackgroundMode=useAppStore(s=>s.setBackgroundMode);
+  const backgroundColor=useAppStore(s=>s.backgroundColor),setBackgroundColor=useAppStore(s=>s.setBackgroundColor);
+  const runtime=useAppStore(s=>s.runtime),status=useAppStore(s=>s.playback.status);
+  const beatIntensity=useAppStore(s=>s.beatIntensity),setBeatIntensity=useAppStore(s=>s.setBeatIntensity);
+  const backgrounds:{id:BackgroundMode;label:string;hint:string}[]=[
+    {id:"album",label:"Album pattern",hint:"A still colour field shaped by the current cover."},
+    {id:"color",label:"Solid colour",hint:"One colour of your choice behind the glass."},
+    {id:"ambient",label:"Ambient drift",hint:"Cover colours move slowly behind the glass."},
+    {id:"glass",label:"Glass only",hint:"The native glass surface, with no added background."}
   ];
-  const visibleOptions = options.filter(
-    (option) => option.id !== "audio" || runtime?.platform === "win32"
-  );
-
-  useEffect(() => {
-    if (runtime && runtime.platform !== "win32" && accentSource === "audio") {
-      setAccentSource("artwork");
-    }
-  }, [accentSource, runtime, setAccentSource]);
-
-  return (
-    <SectionCard>
-      <SectionHeader title="Appearance" />
-      <p className="text-sm leading-6 text-[var(--muted)]">
-        The interface stays monotone and borrows one accent colour from whatever is playing.
-      </p>
-      <div
-        className={cn(
-          "amp-appearance-options",
-          visibleOptions.length === 3 ? "grid-cols-3" : "grid-cols-2"
-        )}
-      >
-        {visibleOptions.map((option) => (
-          <button
-            key={option.id}
-            type="button"
-            aria-pressed={accentSource === option.id}
-            onClick={() => {
-              setAccentSource(option.id);
-              if (option.id === "audio") {
-                // Acquire the system-audio loopback inside this click so the request carries the
-                // user gesture Chromium wants for getDisplayMedia.
-                audioReactor.primeLoopback();
-              }
-            }}
-            className={cn(
-              "amp-appearance-option transition-colors",
-              accentSource === option.id
-                ? "border-[var(--acid)] bg-[var(--paper)]/5"
-                : "border-[var(--edge)] bg-[var(--panel)] hover:border-[var(--acid)]/40"
-            )}
-          >
-            <p className="font-display text-lg text-[var(--paper)]">{option.label}</p>
-            <p className="mt-1 text-xs leading-5 text-[var(--muted)]">{option.hint}</p>
-          </button>
-        ))}
+  const accents:{id:AccentSource;label:string;hint:string}[]=[
+    {id:"artwork",label:"Album art",hint:"Buttons and highlights borrow the cover colour."},
+    {id:"audio",label:"Song audio",hint:"Cover accents with a gentle audio pulse during playback."},
+    {id:"static",label:"Neutral",hint:"AMP's fixed, neutral highlights."}
+  ];
+  useEffect(()=>{
+    if(runtime && runtime.platform!=="win32" && accentSource==="audio")setAccentSource("artwork");
+  },[runtime,accentSource,setAccentSource]);
+  return <SectionCard>
+    <SectionHeader title="Appearance"/>
+    <p className="text-sm leading-6 text-[var(--muted)]">Choose what sits behind AMP's continuous glass surface.</p>
+    <div className="amp-appearance-options" aria-label="Background style">
+      {backgrounds.map(option=><button key={option.id} type="button" aria-pressed={backgroundMode===option.id}
+        onClick={()=>setBackgroundMode(option.id)} className="amp-appearance-option transition-colors">
+        <p className="font-display text-lg text-[var(--paper)]">{option.label}</p>
+        <p className="mt-1 text-xs leading-5 text-[var(--muted)]">{option.hint}</p>
+      </button>)}
+    </div>
+    {backgroundMode==="color"?<div className="mt-4 flex items-center justify-between gap-3">
+      <label htmlFor="amp-background-color" className="text-sm text-[var(--paper)]">Background colour</label>
+      <div className="flex items-center gap-3">
+        <span className="tnum text-xs text-[var(--muted)]">{backgroundColor.toUpperCase()}</span>
+        <input id="amp-background-color" type="color" value={backgroundColor} onChange={event=>setBackgroundColor(event.target.value)}
+          aria-label="Background colour" className="amp-color-picker"/>
       </div>
-
-      {accentSource === "audio" ? (
-        <div className="mt-5">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-[var(--paper)]">Pulse intensity</p>
-            <span className="tnum text-xs text-[var(--faint)]">
-              {Math.round(beatIntensity * 100)}%
-            </span>
-          </div>
-          <input
-            type="range"
-            min={0}
-            max={BEAT_INTENSITY_MAX}
-            step={0.05}
-            value={beatIntensity}
-            onChange={(event) => setBeatIntensity(Number(event.target.value))}
-            style={sliderFill((beatIntensity / BEAT_INTENSITY_MAX) * 100)}
-            className="mt-2 w-full"
-            aria-label="Beat pulse intensity"
-          />
-          <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
-            How strongly the background pulses on the beat. 0% holds it steady.
-          </p>
-        </div>
-      ) : null}
-
-      <p className="mt-4 flex items-start gap-2 text-xs leading-5 text-[var(--muted)]">
-        <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-        Beat detection listens to AMP's own output — SoundCloud directly, Spotify via Windows
-        audio capture. Nothing is recorded or stored.
-      </p>
-    </SectionCard>
-  );
+    </div>:null}
+    <p className="mt-5 text-xs font-medium text-[var(--paper)]">Accent colour</p>
+    <div className="amp-appearance-options" aria-label="Accent colour">
+      {accents.filter(option=>option.id!=="audio" || runtime?.platform==="win32").map(option=>
+        <button key={option.id} type="button" aria-pressed={accentSource===option.id} onClick={()=>{
+          setAccentSource(option.id);
+          if(option.id==="audio" && status==="playing" && backgroundMode!=="glass" && beatIntensity>0 &&
+            isWindowActive() && !matchMedia("(prefers-reduced-motion: reduce)").matches &&
+            !matchMedia("(prefers-reduced-transparency: reduce)").matches && !matchMedia("(forced-colors: active)").matches)audioReactor.primeLoopback();
+        }} className="amp-appearance-option transition-colors">
+          <p className="font-display text-lg text-[var(--paper)]">{option.label}</p>
+          <p className="mt-1 text-xs leading-5 text-[var(--muted)]">{option.hint}</p>
+        </button>)}
+    </div>
+    {accentSource==="audio" && backgroundMode!=="glass"?<div className="mt-5">
+      <div className="flex items-center justify-between"><p className="text-sm text-[var(--paper)]">Pulse intensity</p>
+        <span className="tnum text-xs text-[var(--faint)]">{Math.round(beatIntensity*100)}%</span></div>
+      <input type="range" min={0} max={BEAT_INTENSITY_MAX} step={0.05} value={beatIntensity}
+        onChange={event=>setBeatIntensity(Number(event.target.value))} style={sliderFill(beatIntensity/BEAT_INTENSITY_MAX*100)}
+        className="mt-2 w-full" aria-label="Beat pulse intensity"/>
+      <p className="mt-1 text-xs leading-5 text-[var(--muted)]">0% holds the background still and stops audio analysis.</p>
+    </div>:null}
+    <p className="mt-4 flex items-start gap-2 text-xs leading-5 text-[var(--muted)]">
+      <Info className="mt-0.5 h-3.5 w-3.5 shrink-0"/>Motion pauses when AMP is hidden. Reduced-motion preferences keep the background still.
+      {accentSource==="audio" && backgroundMode!=="glass"?" Audio pulse uses Windows system-output analysis during visible playback. Nothing is recorded or stored.":""}
+    </p>
+  </SectionCard>;
 }
 
 function LocalMusicCard() {

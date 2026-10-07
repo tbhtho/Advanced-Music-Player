@@ -49,6 +49,8 @@ import {
   deletePlaylist as deletePlaylistRecord,
   disconnectProvider as disconnectProviderRecord,
   loadAccentSource,
+  loadBackgroundMode,
+  loadBackgroundColor,
   loadBeatIntensity,
   loadDiscordPresenceEnabled,
   loadOnboardingComplete,
@@ -64,6 +66,8 @@ import {
   saveTrackFeatures,
   replaceRecentTracks,
   saveAccentSource,
+  saveBackgroundMode,
+  saveBackgroundColor,
   saveBeatIntensity,
   saveDiscordPresenceEnabled,
   saveOnboardingComplete,
@@ -76,6 +80,7 @@ import {
   type AccentSource
 } from "@/lib/localStore";
 import { isTrackMatch } from "@/lib/utils";
+import { type BackgroundMode } from "@/lib/songAppearance";
 import {
   buildDailyMixes,
   buildScoredStation,
@@ -228,6 +233,8 @@ interface AppState {
   playback: PlaybackState;
   shuffle: boolean;
   accentSource: AccentSource;
+  backgroundMode: BackgroundMode;
+  backgroundColor: string;
   beatIntensity: number;
   discordPresenceEnabled: boolean;
   onboardingComplete: boolean;
@@ -321,6 +328,8 @@ interface AppState {
   setProviderVolume(provider: Provider, volume: number): Promise<void>;
   toggleShuffle(): void;
   setAccentSource(source: AccentSource): void;
+  setBackgroundMode(mode: BackgroundMode): void;
+  setBackgroundColor(color: string): void;
   /** Set the beat-pulse strength for "audio" accent mode (0–2, 1 = default). */
   setBeatIntensity(value: number): void;
   setDiscordPresenceEnabled(enabled: boolean): void;
@@ -1278,6 +1287,8 @@ export const useAppStore = create<AppState>((set, get) => {
     playback: createEmptyPlaybackState(),
     shuffle: loadShuffle(),
     accentSource: loadAccentSource(),
+    backgroundMode: loadBackgroundMode(),
+    backgroundColor: loadBackgroundColor(),
     beatIntensity: loadBeatIntensity(),
     discordPresenceEnabled: loadDiscordPresenceEnabled(),
     onboardingComplete: loadOnboardingComplete() === true,
@@ -3156,6 +3167,14 @@ export const useAppStore = create<AppState>((set, get) => {
       set({ accentSource: source });
     },
 
+    setBackgroundMode(mode) {
+      saveBackgroundMode(mode);
+      set({backgroundMode:loadBackgroundMode()});
+    },
+    setBackgroundColor(color) {
+      saveBackgroundColor(color);
+      set({backgroundColor:loadBackgroundColor()});
+    },
     setBeatIntensity(value) {
       saveBeatIntensity(value);
       const clamped = loadBeatIntensity();

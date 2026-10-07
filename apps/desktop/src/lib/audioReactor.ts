@@ -1,7 +1,7 @@
 /**
  * AudioReactor — makes the song-tinted gradient actually move with the song.
  *
- * It runs a requestAnimationFrame loop over an AnalyserNode, does onset (beat) detection on the
+ * It samples an AnalyserNode at most 20 times per second, does onset (beat) detection on the
  * bass band via spectral flux against an adaptive threshold, smooths overall loudness with
  * fast-attack/slow-release envelopes, and writes ONLY two CSS custom properties — `--beat` and
  * `--energy` — onto :root. A single dedicated, GPU-composited overlay layer consumes them via
@@ -19,14 +19,13 @@
  * If loopback isn't available the reactor never fires and the UI keeps the static artwork tint.
  */
 
-const FLUX_WINDOW = 27; // ~0.8 s at the reactor's 33 fps sampling rate
+const FLUX_WINDOW = 16; // ~0.8 s at the reactor's 20 Hz sampling rate
 const BEAT_DECAY_TAU_MS = 170; // beat pulse half-life feel: punchy but not strobing
 const BEAT_REFRACTORY_MS = 160; // ignore re-triggers faster than ~375 BPM
 const ENERGY_ATTACK = 0.35;
 const ENERGY_RELEASE = 0.055;
-// Sample/emit at ~33 fps, not every frame: beat motion still reads as smooth, but we halve the
-// per-frame work (analyser read + CSS write + composite) so the main thread stays responsive.
-const FRAME_INTERVAL_MS = 30;
+// Bounded 20 Hz analysis; no display-refresh-rate callbacks while capture is pending or absent.
+const FRAME_INTERVAL_MS = 50;
 
 export class AudioReactor {
   private loopbackCtx: AudioContext | null = null;
@@ -37,7 +36,9 @@ export class AudioReactor {
   private acquisitionGeneration = 0;
 
   private freq: Uint8Array<ArrayBuffer> | null = null;
-  private raf = 0;
+  private timer: ReturnType<typeof setTimeout> | undefined;
+  private lastBeatValue = "";
+  private lastEnergyValue = "";
   private running = false;
   /** The beat overlay element we write CSS vars to. Targeting THIS element (not :root) keeps the
    *  per-frame style invalidation to one node — writing --beat/--energy on documentElement made
@@ -78,9 +79,9 @@ export class AudioReactor {
     }
     this.running = true;
     const targetEl = this.resolveTarget();
-    if (targetEl) targetEl.style.willChange = "opacity, transform";
+    if (targetEl && this.loopbackAnalyser) targetEl.style.willChange = "opacity, transform";
     this.lastFrameAt = performance.now();
-    this.raf = requestAnimationFrame(this.tick);
+    this.schedule();
   }
 
   stop(): void {
@@ -88,11 +89,14 @@ export class AudioReactor {
       return;
     }
     this.running = false;
-    cancelAnimationFrame(this.raf);
+    clearTimeout(this.timer);
+    this.timer = undefined;
     this.beatEnv = 0;
     this.energyEnv = 0;
     this.prevBass = -1;
     this.fluxHistory = [];
+    this.lastBeatValue = this.lastEnergyValue = "";
+    this.freq = null;
     // Settle the overlay to invisible (opacity follows these). The artwork accent vars are owned by
     // SongColor and are left untouched, so the UI keeps its song tint without a per-frame rewrite.
     const targetEl = this.resolveTarget();
@@ -157,7 +161,7 @@ export class AudioReactor {
           return false;
         }
         // latencyHint "playback" lets Chromium use larger audio buffers (less frequent processing
-        // = less CPU) — we only need ~30 Hz of spectrum data, not low-latency monitoring.
+        // = less CPU) — we only need 20 Hz of spectrum data, not low-latency monitoring.
         const ctx = new AudioContext({ latencyHint: "playback" });
         const source = ctx.createMediaStreamSource(stream);
         const analyser = ctx.createAnalyser();
@@ -176,6 +180,11 @@ export class AudioReactor {
           },
           { once: true }
         );
+        if (this.running) {
+          const target=this.resolveTarget();
+          if (target) target.style.willChange="opacity, transform";
+          this.schedule();
+        }
         return true;
       } catch {
         if (generation === this.acquisitionGeneration) {
@@ -189,17 +198,20 @@ export class AudioReactor {
     return this.acquiringLoopback;
   }
 
+  private schedule(): void {
+    // Pending/failed capture has no animation loop. At most 20 analysis samples per second.
+    if (!this.running || !this.loopbackAnalyser || this.timer !== undefined) return;
+    this.timer = setTimeout(() => {
+      this.timer = undefined;
+      this.tick(performance.now());
+    }, FRAME_INTERVAL_MS);
+  }
+
   private tick = (now: number) => {
     if (!this.running) {
       return;
     }
-    this.raf = requestAnimationFrame(this.tick);
-
-    // Throttle the heavy work (analyser read + envelopes + CSS write) to ~33 fps. rAF still drives
-    // it so it pauses with the tab, but we skip frames in between to keep the main thread free.
-    if (now - this.lastEmitAt < FRAME_INTERVAL_MS) {
-      return;
-    }
+    this.schedule();
 
     if (!this.loopbackAnalyser) {
       return;
@@ -240,7 +252,7 @@ export class AudioReactor {
     // Loudness envelope: jumps up fast, falls slowly — "breathing", not flicker.
     const target = Math.min(1, total * 2.4);
     const k = target > this.energyEnv ? ENERGY_ATTACK : ENERGY_RELEASE;
-    this.energyEnv += (target - this.energyEnv) * k;
+    this.energyEnv += (target - this.energyEnv) * (1 - (1 - k) ** (dt / 30));
 
     // Beat onset: positive bass flux above the song's own recent mean + deviation.
     if (this.prevBass >= 0) {
@@ -253,7 +265,7 @@ export class AudioReactor {
       const mean = this.fluxHistory.reduce((acc, value) => acc + value, 0) / n;
       const variance = this.fluxHistory.reduce((acc, value) => acc + (value - mean) ** 2, 0) / n;
       const threshold = mean + 1.6 * Math.sqrt(variance) + 0.006;
-      if (n >= 12 && flux > threshold && bass > 0.16 && now - this.lastBeatAt > BEAT_REFRACTORY_MS) {
+      if (n >= 8 && flux > threshold && bass > 0.16 && now - this.lastBeatAt > BEAT_REFRACTORY_MS) {
         this.beatEnv = 1;
         this.lastBeatAt = now;
       }
@@ -270,8 +282,9 @@ export class AudioReactor {
     // style invalidation is confined to that single node — no document-wide custom-property recalc.
     const targetEl = this.resolveTarget();
     if (targetEl) {
-      targetEl.style.setProperty("--beat", this.beatEnv.toFixed(3));
-      targetEl.style.setProperty("--energy", this.energyEnv.toFixed(3));
+      const beat=this.beatEnv.toFixed(2), energy=this.energyEnv.toFixed(2);
+      if (beat !== this.lastBeatValue) { targetEl.style.setProperty("--beat", beat); this.lastBeatValue=beat; }
+      if (energy !== this.lastEnergyValue) { targetEl.style.setProperty("--energy", energy); this.lastEnergyValue=energy; }
     }
   };
 }

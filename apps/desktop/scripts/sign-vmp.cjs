@@ -16,7 +16,7 @@
  * client (same mechanism TIDAL Hi-Fi / soundcloud-rpc / BetterSoundCloud use).
  * No DRM is circumvented: content is still only ever decrypted inside the CDM.
  *
- * PREREQUISITE (one-time, run by a human — see apps/desktop/DRM-SIGNING.md):
+ * PREREQUISITE (one-time, run by a human — see README.md (Build from source)):
  *   pip install --upgrade castlabs-evs
  *   python -m castlabs_evs.account signup     # or: reauth
  *
@@ -178,7 +178,7 @@ exports.default = async function signVmp(context) {
         "  pip install --upgrade castlabs-evs",
         "  python -m castlabs_evs.account signup        # verify via the emailed link",
         "",
-        "See apps/desktop/DRM-SIGNING.md for the full runbook.",
+        "See README.md (Build from source) for packaging requirements.",
         "To deliberately build WITHOUT DRM signing, set AMP_SKIP_VMP=1."
       ].join("\n")
     );
@@ -222,7 +222,7 @@ exports.default = async function signVmp(context) {
         `EVS VMP signing exited with code ${result.status}.`,
         "Common causes: not signed in (run `python -m castlabs_evs.account reauth`),",
         "expired session, wrong EVS_ACCOUNT_NAME/EVS_PASSWD in apps/desktop/.env.local,",
-        "or no network. See apps/desktop/DRM-SIGNING.md."
+        "or no network. See README.md (Build from source)."
       ].join("\n")
     );
   }

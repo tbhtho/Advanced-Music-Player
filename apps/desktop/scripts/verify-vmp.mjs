@@ -83,7 +83,7 @@ if (totalSigs === 0) {
   console.error(
     "\n[verify:vmp] FAIL — no VMP signatures found. This build is development-signed and\n" +
       "             will get HTTP 403 on the SoundCloud license server. Ensure the EVS\n" +
-      "             account is set up and re-run the build. See apps/desktop/DRM-SIGNING.md."
+      "             account is set up and re-run the build. See README.md (Build from source)."
   );
   process.exit(1);
 }
