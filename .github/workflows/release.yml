@@ -1,7 +1,7 @@
 name: Release
 
 # Builds the Windows installer and, on a version tag, drafts a GitHub release you can
-# review and publish. See RELEASING.md for the required secrets and the cut-a-release steps.
+# review and publish. See README.md (Build from source) for packaging requirements.
 #
 # Triggers:
 #   - push a tag like v0.1.0  -> build + draft a release for that tag

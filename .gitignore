@@ -21,3 +21,9 @@ packages/core/.advtest/
 
 # Local desktop measurement and preview evidence
 artifacts/
+
+# Local engineering guides and measurements
+/docs/
+/RELEASING.md
+/apps/desktop/DRM-SIGNING.md
+/bin/README.md
