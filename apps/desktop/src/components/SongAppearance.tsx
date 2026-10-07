@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useAppStore } from "@/state/useAppStore";
 import { audioReactor } from "@/lib/audioReactor";
 import { isWindowActive, subscribeWindowActivity } from "@/lib/windowActivity";
-import { getArtworkAppearance, type ArtworkAppearance } from "@/lib/songAppearance";
+import { getArtworkAppearance, getArtworkBackground, type ArtworkAppearance } from "@/lib/songAppearance";
 
 const DEFAULT_ACCENT="#e8e4da";
 export function SongAppearance() {
@@ -11,6 +11,9 @@ export function SongAppearance() {
   const accentSource=useAppStore(s=>s.accentSource);
   const backgroundMode=useAppStore(s=>s.backgroundMode);
   const backgroundColor=useAppStore(s=>s.backgroundColor);
+  const artworkBlur=useAppStore(s=>s.artworkBlur);
+  const glassTransparency=useAppStore(s=>s.glassTransparency);
+  const [background,setBackground]=useState<{url:string;pattern:string}>();
   const platform=useAppStore(s=>s.runtime?.platform);
   const beatIntensity=useAppStore(s=>s.beatIntensity);
   const status=useAppStore(s=>s.playback.status);
@@ -21,9 +24,21 @@ export function SongAppearance() {
   useEffect(()=>{
     let active=true;
     if(!needsArtwork || !artworkUrl){setAppearance(undefined);return;}
+    setAppearance(undefined);
     void getArtworkAppearance(artworkUrl).then(value=>{if(active)setAppearance(value);});
     return ()=>{active=false;};
   },[artworkUrl,needsArtwork]);
+  useEffect(()=>{
+    document.documentElement.style.setProperty("--glass-opacity",String(1-glassTransparency/100));
+    return ()=>{document.documentElement.style.removeProperty("--glass-opacity");};
+  },[glassTransparency]);
+  useEffect(()=>{
+    let active=true;
+    if(!artworkUrl || (backgroundMode!=="album" && backgroundMode!=="ambient")){setBackground(undefined);return;}
+    // Debounce slider drags. Previous artwork is hidden immediately when the track changes.
+    const timer=setTimeout(()=>{void getArtworkBackground(artworkUrl,artworkBlur).then(pattern=>{if(active)setBackground(pattern?{url:artworkUrl,pattern}:undefined);});},100);
+    return ()=>{active=false;clearTimeout(timer);};
+  },[artworkUrl,artworkBlur,backgroundMode]);
   useEffect(()=>{
     const root=document.documentElement;
     root.style.setProperty("--acid",accentSource==="static"?DEFAULT_ACCENT:(appearance?.accent??DEFAULT_ACCENT));
@@ -42,17 +57,18 @@ export function SongAppearance() {
     let timer:ReturnType<typeof setTimeout>|undefined, elapsed=0,previous=performance.now();
     const tick=()=>{
       const now=performance.now();elapsed+=Math.min(1000,now-previous);previous=now;
-      const phase=elapsed/90000*Math.PI*2;
-      layer.style.transform="translate3d("+(Math.sin(phase)*2).toFixed(3)+"%, "+(Math.cos(phase*.7)*1.2).toFixed(3)+"%, 0) scale(1.025)";
+      const phase=elapsed/40000*Math.PI*2;
+      layer.style.transform="translate3d("+(Math.sin(phase)*3).toFixed(3)+"%, "+(Math.sin(phase*.7)*2).toFixed(3)+"%, 0) scale(1.06)";
       // One element, two samples per second. No rAF, animated filters, gradient stops or React state.
       timer=setTimeout(tick,500);
     };
     const sync=()=>{
       clearTimeout(timer);
-      const moving=backgroundMode==="ambient" && isWindowActive() && !reduced.matches && !transparency.matches && !contrast.matches;
+      const moving=backgroundMode==="ambient" && !!background && background.url===artworkUrl && isWindowActive() && !reduced.matches && !transparency.matches && !contrast.matches;
       root.dataset.ambientMotion=moving?"running":"paused";
       layer.style.willChange=moving?"transform":"auto";
       if(moving){previous=performance.now();tick();}
+      else layer.style.transform="none";
     };
     const unsubscribeActivity=subscribeWindowActivity(sync);
     for(const query of [reduced,transparency,contrast])query.addEventListener("change",sync);
@@ -61,7 +77,7 @@ export function SongAppearance() {
       for(const query of [reduced,transparency,contrast])query.removeEventListener("change",sync);
       layer.style.willChange="auto";
     };
-  },[backgroundMode]);
+  },[backgroundMode,background,artworkUrl]);
 
   useEffect(()=>{
     const reduced=matchMedia("(prefers-reduced-motion: reduce)");
@@ -96,6 +112,6 @@ export function SongAppearance() {
   },[accentSource,backgroundMode,beatIntensity,platform,status]);
   useEffect(()=>()=>audioReactor.releaseLoopback(),[]);
   const style=backgroundMode==="color"?{backgroundColor,backgroundImage:"none"}:
-    appearance?{backgroundImage:'url("'+appearance.pattern+'")'}:undefined;
-  return <div ref={layerRef} className="amp-ambient-layer" aria-hidden style={style}/>;
+    background?.url===artworkUrl && background?{backgroundImage:'url("'+background.pattern+'")'}:undefined;
+  return <div ref={layerRef} className="amp-ambient-layer" data-artwork={background?.url===artworkUrl && !!background?"ready":"missing"} aria-hidden style={style}/>;
 }

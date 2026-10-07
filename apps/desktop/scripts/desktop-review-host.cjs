@@ -88,12 +88,12 @@ async function run() {
     }; poll();
   })`, true);
   startup.hostReadyMs = +(performance.now() - startedAt).toFixed(2);
-  if (spec.visible) { window.center(); window.showInactive(); }
+  if (spec.visible) { window.setAlwaysOnTop(true); window.center(); window.showInactive(); }
   await delay(800);
   if (spec.appearanceReview) {
     await require('./appearance-review.cjs')({app,window,contents,spec,material});
     assert.deepEqual(errors, [], 'Fixture renderer reported an error');
-    if (!spec.hold) {window.destroy();app.quit();}
+    if (!spec.hold) {window.destroy();app.quit();} else {window.setAlwaysOnTop(false);}
     return;
   }
   const searches = await contents.executeJavaScript(`(async () => {

@@ -30,6 +30,7 @@ module.exports = async ({app, window, contents, spec, material}) => {
       mainRadius:getComputedStyle(main).borderRadius,overflow:document.documentElement.scrollWidth>innerWidth,
       prefs:JSON.parse(localStorage.getItem('spot-cloud.ui-prefs')),captureRequests:window.__AMP_CAPTURE_COUNTS__?.requests??0};
   })()`);
+  const refinement=await evaluate("typeof window.__AMP_TEST_STORE__.getState().setGlassTransparency==='function'");
   const cases=candidate?[
     {name:'glass-paused',mode:'glass',accent:'artwork',playing:false},
     {name:'album-paused',mode:'album',accent:'artwork',playing:false},
@@ -45,7 +46,8 @@ module.exports = async ({app, window, contents, spec, material}) => {
     {name:'artwork-frozen-playing',accent:'artwork',playing:true,freeze:true}
   ];
   const samples=[];
-  for(const entry of spec.appearanceChecksOnly?[]:cases){
+  for(const entry of spec.appearanceChecksOnly?[]:cases.filter(entry=>!spec.sampleCases||spec.sampleCases.includes(entry.name))){
+    if(spec.visible){window.show();window.moveTop();}
     await evaluate(`(() => {
       const store=window.__AMP_TEST_STORE__, state=store.getState();
       state.setAccentSource(${JSON.stringify(entry.accent)});
@@ -57,6 +59,7 @@ module.exports = async ({app, window, contents, spec, material}) => {
       document.querySelector('.amp-ambient-layer').style.animationPlayState=${JSON.stringify(entry.freeze?'paused':'')};
     })()`);
     await delay(1200);
+    if(spec.visible){window.hide();window.show();window.moveTop();await delay(150);}
     const before=await metrics(), started=performance.now(); await delay(spec.sampleMs??10000);
     const after=await metrics(),seconds=(performance.now()-started)/1000, old=new Map(before.processes.map(x=>[x.pid,x]));
     const processes=after.processes.map(x=>({...x,cpuSeconds:Math.max(0,(x.cpu.cumulativeCPUUsage??0)-(old.get(x.pid)?.cpu.cumulativeCPUUsage??0))}));
@@ -68,7 +71,14 @@ module.exports = async ({app, window, contents, spec, material}) => {
     await fs.writeFile(path.join(spec.output,entry.name+'.png'),(await contents.capturePage()).toPNG());
   }
   await evaluate("clearInterval(window.__AMP_POLL__);window.__AMP_TEST_STORE__.setState({playback:{...window.__AMP_TEST_STORE__.getState().playback,status:'paused'}})");
-  const checks=candidate?await require("./validate-appearance.cjs")({window,contents,spec,inspect}):undefined;
+  let checks;
+  if(refinement)checks=await require("./validate-appearance.cjs")({window,contents,spec,inspect});
+  else if(candidate){
+    await evaluate("location.hash='#/library'");await delay(150);await evaluate("document.querySelector('.amp-provider-chip[data-provider=spotify]').click()");await delay(100);
+    const before=await evaluate("document.querySelector('.amp-provider-chip[aria-pressed=true]').dataset.provider");
+    await evaluate("location.hash='#/settings'");await delay(150);await evaluate("location.hash='#/library'");await delay(150);
+    const returned=await evaluate("document.querySelector('.amp-provider-chip[aria-pressed=true]').dataset.provider");checks={libraryFilterReproduction:{before,returned,reset:before!==returned}};
+  }
   const report={checks,baseline:!candidate,material,visible:spec.visible,logicalProcessors:os.cpus().length,samples,
     limitations:['Synthetic 120-track library and 12-track queue with simulated 2.5s provider ticks; no live playback, accounts, audio, capture or provider network.',
       'CPU is cumulative process CPU delta divided by wall time and logical processors. Summed working sets repeat shared pages; private commit is not physical RAM.',

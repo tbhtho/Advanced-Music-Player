@@ -2,6 +2,14 @@
 import { resolveArtwork } from "./desktopBridge";
 
 export type BackgroundMode = "album" | "color" | "ambient" | "glass";
+export const ARTWORK_BITMAP_SIZE = 640;
+export const ARTWORK_BLUR_DEFAULT = 6;
+export const ARTWORK_BLUR_MAX = 24;
+export const GLASS_TRANSPARENCY_DEFAULT = 45;
+export const GLASS_TRANSPARENCY_MAX = 60;
+export function normalizeAppearanceNumber(value: unknown, fallback: number, max: number): number {
+  return typeof value === "number" && Number.isFinite(value) ? Math.round(Math.max(0, Math.min(max, value))) : fallback;
+}
 export const DEFAULT_BACKGROUND_COLOR = "#26313d";
 export const BACKGROUND_MODES: readonly BackgroundMode[] = ["album", "color", "ambient", "glass"];
 export function normalizeBackgroundColor(value: unknown): string {
@@ -49,21 +57,41 @@ export function getArtworkAppearance(url: string): Promise<ArtworkAppearance | u
       const canvas=document.createElement("canvas");canvas.width=canvas.height=24;
       const context=canvas.getContext("2d",{willReadFrequently:true});if(!context)return undefined;
       context.drawImage(image,0,0,24,24);
-      const {accent,palette}=sampleCover(context.getImageData(0,0,24,24).data,24);
-      // Six radial fields retain the cover's colour placement in a reusable 256x192 bitmap.
-      canvas.width=256;canvas.height=192;
-      context.fillStyle="#171719";context.fillRect(0,0,256,192);
-      palette.forEach((color,i)=>{
-        const x=(i%3+.5)*256/3,y=(Math.floor(i/3)+.5)*96;
-        const gradient=context.createRadialGradient(x,y,0,x,y,160);
-        gradient.addColorStop(0,"rgba("+color.join(",")+",0.85)");
-        gradient.addColorStop(1,"rgba("+color.join(",")+",0)");
-        context.fillStyle=gradient;context.fillRect(0,0,256,192);
-      });
+      const {accent}=sampleCover(context.getImageData(0,0,24,24).data,24);
+      // Preserve actual cover geometry and lettering in a bounded reusable bitmap.
+      canvas.width=canvas.height=ARTWORK_BITMAP_SIZE;
+      context.drawImage(image,0,0,ARTWORK_BITMAP_SIZE,ARTWORK_BITMAP_SIZE);
       return {accent:"rgb("+accent.join(", ")+")",rgb:accent.join(", "),pattern:canvas.toDataURL("image/png")};
     }catch{return undefined;}
   })();
   cache.set(url,request);
   while(cache.size>MAX_CACHED_ARTWORK)cache.delete(cache.keys().next().value!);
+  return request;
+}
+
+const blurredCache=new Map<string, Promise<string | undefined>>();
+const MAX_BLURRED_ARTWORK=4;
+/** Bake blur only when the cover or control changes; moving the image never reruns a filter. */
+export function getArtworkBackground(url: string, amount: number): Promise<string | undefined> {
+  const blur=normalizeAppearanceNumber(amount,ARTWORK_BLUR_DEFAULT,ARTWORK_BLUR_MAX);
+  const key=url+"\0"+blur;
+  const cached=blurredCache.get(key);
+  if(cached){blurredCache.delete(key);blurredCache.set(key,cached);return cached;}
+  const request=(async()=>{
+    const appearance=await getArtworkAppearance(url);
+    if(!appearance || blur===0)return appearance?.pattern;
+    try {
+      const image=new Image();image.decoding="async";
+      await new Promise<void>((resolve,reject)=>{image.onload=()=>resolve();image.onerror=()=>reject(new Error("Artwork unavailable"));image.src=appearance.pattern;});
+      const canvas=document.createElement("canvas");canvas.width=canvas.height=ARTWORK_BITMAP_SIZE;
+      const context=canvas.getContext("2d");if(!context)return undefined;
+      const padding=blur*3;
+      context.filter="blur("+blur+"px)";
+      context.drawImage(image,-padding,-padding,ARTWORK_BITMAP_SIZE+padding*2,ARTWORK_BITMAP_SIZE+padding*2);
+      return canvas.toDataURL("image/png");
+    }catch{return undefined;}
+  })();
+  blurredCache.set(key,request);
+  while(blurredCache.size>MAX_BLURRED_ARTWORK)blurredCache.delete(blurredCache.keys().next().value!);
   return request;
 }

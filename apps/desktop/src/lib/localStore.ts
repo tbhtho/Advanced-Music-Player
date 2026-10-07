@@ -12,7 +12,7 @@ import {
   type UnifiedTrack
 } from "@amp/core";
 import { createDefaultConnections } from "./defaults";
-import { BACKGROUND_MODES, normalizeBackgroundColor, type BackgroundMode } from "./songAppearance";
+import { BACKGROUND_MODES, normalizeBackgroundColor, normalizeAppearanceNumber, ARTWORK_BLUR_DEFAULT, ARTWORK_BLUR_MAX, GLASS_TRANSPARENCY_DEFAULT, GLASS_TRANSPARENCY_MAX, type BackgroundMode } from "./songAppearance";
 import type { TrackFeatureMap } from "./trackFeatures";
 
 const PLAYLISTS_KEY = "spot-cloud.playlists";
@@ -21,6 +21,7 @@ const PROJECT_TRACKS_KEY = "spot-cloud.project-tracks";
 const UI_PREFS_KEY = "spot-cloud.ui-prefs";
 const AUDIO_FEATURES_KEY = "spot-cloud.audio-features";
 
+export type LibraryProvider = "all" | "spotify" | "soundcloud" | "local";
 export type AccentSource = "artwork" | "audio" | "static";
 
 /** Beat-pulse strength multiplier for "audio" accent mode. 1 = default; 0 = no pulse; 2 = double. */
@@ -31,6 +32,10 @@ interface UiPreferences {
   accentSource?: AccentSource;
   backgroundMode?: BackgroundMode;
   backgroundColor?: string;
+  artworkBlur?: number;
+  glassTransparency?: number;
+  libraryProvider?: LibraryProvider;
+  libraryChip?: string | null;
   beatIntensity?: number;
   soundCloudProfileUrl?: string;
   volume?: number;
@@ -362,6 +367,15 @@ export function saveBackgroundColor(color: string): void {
   const prefs=readJson<UiPreferences>(UI_PREFS_KEY,{});
   writeJson(UI_PREFS_KEY,{...prefs,backgroundColor:normalizeBackgroundColor(color)});
 }
+export function loadArtworkBlur(): number { return normalizeAppearanceNumber(readJson<UiPreferences>(UI_PREFS_KEY,{}).artworkBlur,ARTWORK_BLUR_DEFAULT,ARTWORK_BLUR_MAX); }
+export function saveArtworkBlur(value: number): void { const prefs=readJson<UiPreferences>(UI_PREFS_KEY,{});writeJson(UI_PREFS_KEY,{...prefs,artworkBlur:normalizeAppearanceNumber(value,ARTWORK_BLUR_DEFAULT,ARTWORK_BLUR_MAX)}); }
+export function loadGlassTransparency(): number { return normalizeAppearanceNumber(readJson<UiPreferences>(UI_PREFS_KEY,{}).glassTransparency,GLASS_TRANSPARENCY_DEFAULT,GLASS_TRANSPARENCY_MAX); }
+export function saveGlassTransparency(value: number): void { const prefs=readJson<UiPreferences>(UI_PREFS_KEY,{});writeJson(UI_PREFS_KEY,{...prefs,glassTransparency:normalizeAppearanceNumber(value,GLASS_TRANSPARENCY_DEFAULT,GLASS_TRANSPARENCY_MAX)}); }
+export function loadLibraryProvider(): LibraryProvider { const value=readJson<UiPreferences>(UI_PREFS_KEY,{}).libraryProvider;return value==="spotify" || value==="soundcloud" || value==="local" ? value : "all"; }
+export function saveLibraryProvider(value: LibraryProvider): void { const prefs=readJson<UiPreferences>(UI_PREFS_KEY,{});writeJson(UI_PREFS_KEY,{...prefs,libraryProvider:value}); }
+export function loadLibraryChip(): string | null { const value=readJson<UiPreferences>(UI_PREFS_KEY,{}).libraryChip;return typeof value==="string" && (value==="unknown" || /^(mood|genre):[^\n]{1,100}$/.test(value)) ? value : null; }
+export function saveLibraryChip(value: string | null): void { const prefs=readJson<UiPreferences>(UI_PREFS_KEY,{});writeJson(UI_PREFS_KEY,{...prefs,libraryChip:value}); }
+
 export function loadBeatIntensity(): number {
   const prefs = readJson<UiPreferences>(UI_PREFS_KEY, {});
   const value = prefs.beatIntensity;

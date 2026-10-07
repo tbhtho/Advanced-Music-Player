@@ -70,6 +70,8 @@ import {
 } from "@/lib/desktopBridge";
 import {
   loadListeningStats,
+  loadLibraryProvider, saveLibraryProvider, loadLibraryChip, saveLibraryChip,
+  type LibraryProvider,
   clearListeningStats,
   BEAT_INTENSITY_MAX,
   type AccentSource,
@@ -79,7 +81,7 @@ import { audioReactor } from "@/lib/audioReactor";
 import { AppUpdatesCard, UpdateNotice } from "@/components/AppUpdates";
 import { SongAppearance } from "@/components/SongAppearance";
 import { useShallow } from "zustand/react/shallow";
-import { type BackgroundMode } from "@/lib/songAppearance";
+import { ARTWORK_BLUR_MAX, GLASS_TRANSPARENCY_MAX, type BackgroundMode } from "@/lib/songAppearance";
 import { isWindowActive, subscribeWindowActivity } from "@/lib/windowActivity";
 import { ArtworkImage } from "@/components/ArtworkImage";
 import { VirtualList } from "@/components/VirtualList";
@@ -3426,8 +3428,10 @@ function LibraryPage() {
   const [selecting, setSelecting] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(() => new Set());
   const [multiAddOpen, setMultiAddOpen] = useState(false);
-  const [providerFilter, setProviderFilter] = useState<"all" | Provider>("all");
-  const [selectedChip, setSelectedChip] = useState<string | null>(null);
+  const [providerFilter, setProviderFilter] = useState<LibraryProvider>(loadLibraryProvider);
+  const [selectedChip, setSelectedChip] = useState<string | null>(loadLibraryChip);
+  useEffect(()=>saveLibraryProvider(providerFilter),[providerFilter]);
+  useEffect(()=>saveLibraryChip(selectedChip),[selectedChip]);
   const query = filter.trim().toLowerCase();
   const canSyncSoundCloudLikes =
     connections.soundcloud.status === "connected" &&
@@ -4808,65 +4812,63 @@ function AppearanceCard() {
   const accentSource=useAppStore(s=>s.accentSource),setAccentSource=useAppStore(s=>s.setAccentSource);
   const backgroundMode=useAppStore(s=>s.backgroundMode),setBackgroundMode=useAppStore(s=>s.setBackgroundMode);
   const backgroundColor=useAppStore(s=>s.backgroundColor),setBackgroundColor=useAppStore(s=>s.setBackgroundColor);
+  const artworkBlur=useAppStore(s=>s.artworkBlur),setArtworkBlur=useAppStore(s=>s.setArtworkBlur);
+  const glassTransparency=useAppStore(s=>s.glassTransparency),setGlassTransparency=useAppStore(s=>s.setGlassTransparency);
   const runtime=useAppStore(s=>s.runtime),status=useAppStore(s=>s.playback.status);
   const beatIntensity=useAppStore(s=>s.beatIntensity),setBeatIntensity=useAppStore(s=>s.setBeatIntensity);
-  const backgrounds:{id:BackgroundMode;label:string;hint:string}[]=[
-    {id:"album",label:"Album pattern",hint:"A still colour field shaped by the current cover."},
-    {id:"color",label:"Solid colour",hint:"One colour of your choice behind the glass."},
-    {id:"ambient",label:"Ambient drift",hint:"Cover colours move slowly behind the glass."},
-    {id:"glass",label:"Glass only",hint:"The native glass surface, with no added background."}
-  ];
-  const accents:{id:AccentSource;label:string;hint:string}[]=[
-    {id:"artwork",label:"Album art",hint:"Buttons and highlights borrow the cover colour."},
-    {id:"audio",label:"Song audio",hint:"Cover accents with a gentle audio pulse during playback."},
-    {id:"static",label:"Neutral",hint:"AMP's fixed, neutral highlights."}
-  ];
+  const album=backgroundMode==="album" || backgroundMode==="ambient";
   useEffect(()=>{
     if(runtime && runtime.platform!=="win32" && accentSource==="audio")setAccentSource("artwork");
   },[runtime,accentSource,setAccentSource]);
   return <SectionCard>
     <SectionHeader title="Appearance"/>
-    <p className="text-sm leading-6 text-[var(--muted)]">Choose what sits behind AMP's continuous glass surface.</p>
-    <div className="amp-appearance-options" aria-label="Background style">
-      {backgrounds.map(option=><button key={option.id} type="button" aria-pressed={backgroundMode===option.id}
-        onClick={()=>setBackgroundMode(option.id)} className="amp-appearance-option transition-colors">
-        <p className="font-display text-lg text-[var(--paper)]">{option.label}</p>
-        <p className="mt-1 text-xs leading-5 text-[var(--muted)]">{option.hint}</p>
-      </button>)}
+    <div className="amp-appearance-row">
+      <label htmlFor="amp-background">Background</label>
+      <select id="amp-background" value={album?"album":backgroundMode} onChange={event=>setBackgroundMode(event.target.value as BackgroundMode)} className="amp-select">
+        <option value="album">Album artwork</option><option value="color">Solid colour</option><option value="glass">Glass only</option>
+      </select>
     </div>
-    {backgroundMode==="color"?<div className="mt-4 flex items-center justify-between gap-3">
-      <label htmlFor="amp-background-color" className="text-sm text-[var(--paper)]">Background colour</label>
-      <div className="flex items-center gap-3">
-        <span className="tnum text-xs text-[var(--muted)]">{backgroundColor.toUpperCase()}</span>
-        <input id="amp-background-color" type="color" value={backgroundColor} onChange={event=>setBackgroundColor(event.target.value)}
-          aria-label="Background colour" className="amp-color-picker"/>
+    <div className="amp-appearance-slider">
+      <label htmlFor="amp-transparency">Glass transparency</label><output htmlFor="amp-transparency">{glassTransparency}%</output>
+      <input id="amp-transparency" type="range" min={0} max={GLASS_TRANSPARENCY_MAX} step={1} value={glassTransparency}
+        onChange={event=>setGlassTransparency(Number(event.target.value))} style={sliderFill(glassTransparency/GLASS_TRANSPARENCY_MAX*100)} aria-label="Glass transparency"/>
+      <div className="amp-slider-endpoints"><span>Opaque</span><span>More transparent</span></div>
+    </div>
+    {album?<div className="amp-appearance-slider">
+      <label htmlFor="amp-artwork-blur">Artwork blur</label><output htmlFor="amp-artwork-blur">{artworkBlur===0?"Clear":artworkBlur+" / "+ARTWORK_BLUR_MAX}</output>
+      <input id="amp-artwork-blur" type="range" min={0} max={ARTWORK_BLUR_MAX} step={1} value={artworkBlur}
+        onChange={event=>setArtworkBlur(Number(event.target.value))} style={sliderFill(artworkBlur/ARTWORK_BLUR_MAX*100)} aria-label="Artwork blur"/>
+      <div className="amp-slider-endpoints"><span>Defined</span><span>Soft</span></div>
+      <div className="amp-appearance-row">
+        <label htmlFor="amp-background-motion">Movement</label>
+        <select id="amp-background-motion" value={backgroundMode} onChange={event=>setBackgroundMode(event.target.value as BackgroundMode)} className="amp-select">
+          <option value="album">Still</option><option value="ambient">Ambient drift</option>
+        </select>
       </div>
     </div>:null}
-    <p className="mt-5 text-xs font-medium text-[var(--paper)]">Accent colour</p>
-    <div className="amp-appearance-options" aria-label="Accent colour">
-      {accents.filter(option=>option.id!=="audio" || runtime?.platform==="win32").map(option=>
-        <button key={option.id} type="button" aria-pressed={accentSource===option.id} onClick={()=>{
-          setAccentSource(option.id);
-          if(option.id==="audio" && status==="playing" && backgroundMode!=="glass" && beatIntensity>0 &&
-            isWindowActive() && !matchMedia("(prefers-reduced-motion: reduce)").matches &&
-            !matchMedia("(prefers-reduced-transparency: reduce)").matches && !matchMedia("(forced-colors: active)").matches)audioReactor.primeLoopback();
-        }} className="amp-appearance-option transition-colors">
-          <p className="font-display text-lg text-[var(--paper)]">{option.label}</p>
-          <p className="mt-1 text-xs leading-5 text-[var(--muted)]">{option.hint}</p>
-        </button>)}
-    </div>
-    {accentSource==="audio" && backgroundMode!=="glass"?<div className="mt-5">
-      <div className="flex items-center justify-between"><p className="text-sm text-[var(--paper)]">Pulse intensity</p>
-        <span className="tnum text-xs text-[var(--faint)]">{Math.round(beatIntensity*100)}%</span></div>
-      <input type="range" min={0} max={BEAT_INTENSITY_MAX} step={0.05} value={beatIntensity}
-        onChange={event=>setBeatIntensity(Number(event.target.value))} style={sliderFill(beatIntensity/BEAT_INTENSITY_MAX*100)}
-        className="mt-2 w-full" aria-label="Beat pulse intensity"/>
-      <p className="mt-1 text-xs leading-5 text-[var(--muted)]">0% holds the background still and stops audio analysis.</p>
+    {backgroundMode==="color"?<div className="amp-appearance-row">
+      <label htmlFor="amp-background-color">Colour</label>
+      <div className="flex items-center gap-3"><span className="tnum text-xs text-[var(--muted)]">{backgroundColor.toUpperCase()}</span>
+        <input id="amp-background-color" type="color" value={backgroundColor} onChange={event=>setBackgroundColor(event.target.value)} aria-label="Background colour" className="amp-color-picker"/>
+      </div>
     </div>:null}
-    <p className="mt-4 flex items-start gap-2 text-xs leading-5 text-[var(--muted)]">
-      <Info className="mt-0.5 h-3.5 w-3.5 shrink-0"/>Motion pauses when AMP is hidden. Reduced-motion preferences keep the background still.
-      {accentSource==="audio" && backgroundMode!=="glass"?" Audio pulse uses Windows system-output analysis during visible playback. Nothing is recorded or stored.":""}
-    </p>
+    <details className="amp-appearance-details">
+      <summary>Accent &amp; audio</summary>
+      <div className="amp-appearance-row"><label htmlFor="amp-accent">Accent</label>
+        <select id="amp-accent" value={accentSource} className="amp-select" onChange={event=>{
+          const source=event.target.value as AccentSource;setAccentSource(source);
+          if(source==="audio" && status==="playing" && backgroundMode!=="glass" && beatIntensity>0 && isWindowActive() &&
+            !matchMedia("(prefers-reduced-motion: reduce)").matches && !matchMedia("(prefers-reduced-transparency: reduce)").matches && !matchMedia("(forced-colors: active)").matches)audioReactor.primeLoopback();
+        }}><option value="artwork">From artwork</option><option value="static">Neutral</option>{runtime?.platform==="win32"?<option value="audio">Audio pulse</option>:null}</select>
+      </div>
+      {accentSource==="audio" && backgroundMode!=="glass"?<div className="amp-appearance-slider">
+        <label htmlFor="amp-pulse">Pulse intensity</label><output htmlFor="amp-pulse">{Math.round(beatIntensity*100)}%</output>
+        <input id="amp-pulse" type="range" min={0} max={BEAT_INTENSITY_MAX} step={0.05} value={beatIntensity} onChange={event=>setBeatIntensity(Number(event.target.value))}
+          style={sliderFill(beatIntensity/BEAT_INTENSITY_MAX*100)} aria-label="Beat pulse intensity"/>
+        <p className="col-span-2 text-xs leading-5 text-[var(--muted)]">Windows system-output analysis. Nothing is recorded. 0% turns it off.</p>
+      </div>:null}
+    </details>
+    <p className="mt-3 text-xs leading-5 text-[var(--muted)]">{album?"The current cover sits behind the glass. Missing artwork uses plain glass. ":""}Movement pauses when hidden or reduced motion is enabled.</p>
   </SectionCard>;
 }
 

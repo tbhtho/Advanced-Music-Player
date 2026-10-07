@@ -5,6 +5,7 @@
 :root {
   /* Surfaces — layered from the window shell up to raised cards. A little more separation between
      the steps than before gives the near-black UI real depth instead of reading as one flat slab. */
+  --glass-opacity: 0.55;
   --shell: #171719;
   --panel-strong: #19191c;
   --panel: #202023;
@@ -88,7 +89,7 @@
 
 /* A more substantial shared tint lets the desktop soften the shell without competing with text. */
 html[data-material="glass"] {
-  --shell: rgba(23, 24, 27, 0.84);
+  --shell: #171719;
   --panel-tint: rgba(255, 255, 255, 0.025);
   --sidebar-surface: rgba(255, 255, 255, 0.025);
   --content-surface: var(--panel-tint);
@@ -98,24 +99,25 @@ html[data-material="glass"] {
 }
 
 
-/* A small, reusable cover-derived bitmap sits behind the shared glass canvas.
+/* Actual cover artwork is blurred into a bounded bitmap once per change.
    Ambient motion writes only this element's transform at two samples per second. */
+html[data-material="glass"] body { background: transparent; }
+.amp-shell::before { content: ""; position: absolute; inset: 0; z-index: -5; pointer-events: none; background: rgba(23,24,27,var(--glass-opacity)); }
 .amp-ambient-layer {
-  position: absolute;
-  inset: -5%;
-  z-index: -10;
-  pointer-events: none;
-  contain: strict;
-  background:
-    radial-gradient(ellipse at 14% 18%, rgba(var(--song-rgb), 0.65), transparent 72%),
-    radial-gradient(ellipse at 86% 84%, rgba(var(--song-rgb), 0.35), transparent 72%);
-  background-size: cover;
-  background-position: center;
-  opacity: 0.24;
+  position: absolute; inset: -8%; z-index: -10; pointer-events: none; contain: strict;
+  background: none; background-size: cover; background-position: center 75%; opacity: 1;
 }
+.amp-ambient-layer::after { content: ""; position: absolute; inset: 0; background: rgba(0,0,0,0.22); }
 html[data-background-mode="glass"] .amp-ambient-layer,
 html[data-background-mode="glass"] #amp-beat-layer { display: none; }
-html[data-background-mode="color"] .amp-ambient-layer { opacity: 0.2; }
+/* A continuous legibility tint protects text even on bright covers at maximum transparency. */
+html[data-background-mode="album"], html[data-background-mode="ambient"], html[data-background-mode="color"] {
+  --panel-tint: rgba(12,13,16,0.35); --content-surface: var(--panel-tint); --sidebar-surface: var(--panel-tint); --bar-tint: var(--panel-tint);
+  --section-surface: rgba(12,13,16,0.14); --muted: #d4d4d8; --faint: #d4d4d8;
+}
+@media (forced-colors: active), (prefers-reduced-transparency: reduce) {
+  .amp-shell::before { background: #171719; }
+}
 @media (prefers-reduced-motion: reduce) {
   .amp-ambient-layer { transform: none !important; }
   #amp-beat-layer { display: none; }
@@ -562,3 +564,11 @@ input[type="range"]::-moz-range-track {
 }
 
 .amp-color-picker { width: 44px; height: 30px; padding: 3px; border: 1px solid var(--edge); border-radius: 6px; background: transparent; cursor: pointer; }
+
+.amp-appearance-row { display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px;font-size:12px; }
+.amp-appearance-slider { display:grid;grid-template-columns:1fr auto;gap:9px 12px;margin-top:18px;font-size:12px; }
+.amp-appearance-slider > input, .amp-slider-endpoints, .amp-appearance-slider > .amp-appearance-row { grid-column:1 / -1;width:100%; }
+.amp-appearance-slider output { color:var(--muted);font-variant-numeric:tabular-nums; }
+.amp-slider-endpoints { display:flex;justify-content:space-between;font-size:10px;color:var(--muted); }
+.amp-appearance-details { margin-top:18px;padding-top:12px;border-top:1px solid var(--hairline);font-size:12px; }
+.amp-appearance-details summary { color:var(--muted);cursor:pointer; }

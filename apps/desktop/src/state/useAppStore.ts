@@ -51,6 +51,8 @@ import {
   loadAccentSource,
   loadBackgroundMode,
   loadBackgroundColor,
+  loadArtworkBlur,
+  loadGlassTransparency,
   loadBeatIntensity,
   loadDiscordPresenceEnabled,
   loadOnboardingComplete,
@@ -68,6 +70,8 @@ import {
   saveAccentSource,
   saveBackgroundMode,
   saveBackgroundColor,
+  saveArtworkBlur,
+  saveGlassTransparency,
   saveBeatIntensity,
   saveDiscordPresenceEnabled,
   saveOnboardingComplete,
@@ -235,6 +239,8 @@ interface AppState {
   accentSource: AccentSource;
   backgroundMode: BackgroundMode;
   backgroundColor: string;
+  artworkBlur: number;
+  glassTransparency: number;
   beatIntensity: number;
   discordPresenceEnabled: boolean;
   onboardingComplete: boolean;
@@ -330,6 +336,8 @@ interface AppState {
   setAccentSource(source: AccentSource): void;
   setBackgroundMode(mode: BackgroundMode): void;
   setBackgroundColor(color: string): void;
+  setArtworkBlur(value: number): void;
+  setGlassTransparency(value: number): void;
   /** Set the beat-pulse strength for "audio" accent mode (0–2, 1 = default). */
   setBeatIntensity(value: number): void;
   setDiscordPresenceEnabled(enabled: boolean): void;
@@ -1289,6 +1297,8 @@ export const useAppStore = create<AppState>((set, get) => {
     accentSource: loadAccentSource(),
     backgroundMode: loadBackgroundMode(),
     backgroundColor: loadBackgroundColor(),
+    artworkBlur: loadArtworkBlur(),
+    glassTransparency: loadGlassTransparency(),
     beatIntensity: loadBeatIntensity(),
     discordPresenceEnabled: loadDiscordPresenceEnabled(),
     onboardingComplete: loadOnboardingComplete() === true,
@@ -3175,6 +3185,8 @@ export const useAppStore = create<AppState>((set, get) => {
       saveBackgroundColor(color);
       set({backgroundColor:loadBackgroundColor()});
     },
+    setArtworkBlur(value) { saveArtworkBlur(value);set({artworkBlur:loadArtworkBlur()}); },
+    setGlassTransparency(value) { saveGlassTransparency(value);set({glassTransparency:loadGlassTransparency()}); },
     setBeatIntensity(value) {
       saveBeatIntensity(value);
       const clamped = loadBeatIntensity();

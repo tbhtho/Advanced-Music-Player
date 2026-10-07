@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { backendModule, delay } from "./backend-fixtures.mjs";
-const { sampleCover, normalizeBackgroundColor, getArtworkAppearance }=await backendModule("../src/lib/songAppearance.ts");
+const { sampleCover, normalizeBackgroundColor, getArtworkAppearance, getArtworkBackground }=await backendModule("../src/lib/songAppearance.ts");
 const prefs=await backendModule("../src/lib/localStore.ts");
 const { AudioReactor }=await backendModule("../src/lib/audioReactor.ts");
 const values=new Map();
@@ -30,12 +30,15 @@ test("cover bitmaps are reused and bounded to eight cached covers",async()=>{
   let loads=0,bitmaps=0;
   globalThis.Image=class{set src(value){loads++;queueMicrotask(()=>this.onload());}};
   const data=new Uint8ClampedArray(24*24*4).fill(180);
-  const context={drawImage(){},getImageData(){return {data};},fillRect(){},createRadialGradient(){return {addColorStop(){}};}};
+  let draws=0;const context={drawImage(){draws++;},getImageData(){return {data};},fillRect(){},createRadialGradient(){return {addColorStop(){}};}};
   globalThis.document={createElement:()=>({getContext:()=>context,toDataURL:()=>{bitmaps++;return "data:image/png;base64,fixture";}})};
   const first=await getArtworkAppearance("data:cover0");assert.equal(await getArtworkAppearance("data:cover0"),first);
-  assert.equal(loads,1);assert.equal(bitmaps,1);
+  assert.equal(loads,1);assert.equal(bitmaps,1);assert.equal(draws,2,"Sample accent and draw actual cover, without palette fields");
+  assert.equal(await getArtworkBackground("data:cover0",0),first.pattern);
+  const blur=await getArtworkBackground("data:cover0",6);assert.equal(await getArtworkBackground("data:cover0",6),blur);assert.equal(bitmaps,2);
+  assert.equal(context.filter,"blur(6px)");
   for(let i=1;i<=8;i++)await getArtworkAppearance("data:cover"+i);
-  await getArtworkAppearance("data:cover0");assert.equal(loads,10);
+  await getArtworkAppearance("data:cover0");assert.equal(loads,11);
 });
 test("pending or failed audio capture has no display-refresh animation loop",async()=>{
   let frames=0,resolve;
@@ -74,4 +77,22 @@ test("native minimize suspends work even when Page Visibility is stale, and late
     event(true);assert.equal(isWindowActive(),true);assert.equal(queries,1);assert.ok(notifications>=3);
   }finally{unsubscribe();globalThis.window=previousWindow;globalThis.document=previousDocument;}
   assert.equal(removed,1);
+});
+
+test("appearance controls clamp invalid values and preserve old background and audio choices",()=>{
+  values.set("spot-cloud.ui-prefs",JSON.stringify({accentSource:"audio",backgroundMode:"ambient",backgroundColor:"#315866",volume:.42,shuffle:true,beatIntensity:.7}));
+  assert.equal(prefs.loadBackgroundMode(),"ambient");assert.equal(prefs.loadArtworkBlur(),6);assert.equal(prefs.loadGlassTransparency(),45);
+  prefs.saveArtworkBlur(9);prefs.saveGlassTransparency(38);
+  assert.equal(prefs.loadArtworkBlur(),9);assert.equal(prefs.loadGlassTransparency(),38);
+  prefs.saveArtworkBlur(Infinity);prefs.saveGlassTransparency(NaN);assert.equal(prefs.loadArtworkBlur(),6);assert.equal(prefs.loadGlassTransparency(),45);
+  prefs.saveArtworkBlur(100);prefs.saveGlassTransparency(-10);assert.equal(prefs.loadArtworkBlur(),24);assert.equal(prefs.loadGlassTransparency(),0);
+  const saved=JSON.parse(values.get("spot-cloud.ui-prefs"));assert.equal(saved.accentSource,"audio");assert.equal(saved.backgroundMode,"ambient");assert.equal(saved.volume,.42);assert.equal(saved.shuffle,true);assert.equal(saved.beatIntensity,.7);
+});
+test("Library provider and chip preferences survive reload and preserve unrelated preferences",()=>{
+  values.set("spot-cloud.ui-prefs",JSON.stringify({volume:.37,backgroundMode:"color",backgroundColor:"#abcdef"}));
+  assert.equal(prefs.loadLibraryProvider(),"all");assert.equal(prefs.loadLibraryChip(),null);
+  for(const provider of ["spotify","soundcloud","all","local"]){prefs.saveLibraryProvider(provider);assert.equal(prefs.loadLibraryProvider(),provider);}
+  prefs.saveLibraryChip("genre:jazz");assert.equal(prefs.loadLibraryChip(),"genre:jazz");prefs.saveLibraryChip(null);assert.equal(prefs.loadLibraryChip(),null);
+  const saved=JSON.parse(values.get("spot-cloud.ui-prefs"));assert.equal(saved.volume,.37);assert.equal(saved.backgroundColor,"#abcdef");
+  values.set("spot-cloud.ui-prefs",JSON.stringify({libraryProvider:"youtube",libraryChip:42}));assert.equal(prefs.loadLibraryProvider(),"all");assert.equal(prefs.loadLibraryChip(),null);
 });
